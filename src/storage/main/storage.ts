@@ -21,7 +21,7 @@ export abstract class StoreManager<O extends IndexableObject> {
     const items: O[] = Object.values(idx);
 
     for (const obj of items) {
-      await this.store(obj, storage);
+      await this.store(obj, storage, false);
     }
 
     this._index = idx;
@@ -73,11 +73,10 @@ export abstract class StoreManager<O extends IndexableObject> {
   // TODO: Use `toUseableObject(data: any) => O` to post-process loaded data
 
   // Stores object in DB
-  public async store(obj: O, storage: Storage<any>): Promise<boolean> {
+  public async store(obj: O, storage: Storage<any>, updateIndex = true): Promise<boolean> {
     const objDir = path.join(this.rootDir, `${obj.id}`);
     const objPath = path.join(storage.workDir, objDir);
     const storeable = this.toStoreableObject(obj);
-    const idx = await this.getIndex(storage);
 
     await storage.fs.ensureDir(objPath);
     for (const key of Object.keys(storeable)) {
@@ -85,9 +84,16 @@ export abstract class StoreManager<O extends IndexableObject> {
       await storage.yaml.store(path.join(objPath, `${key}.yaml`), data);
     }
 
-    idx[obj.id] = obj;
-    this._index = idx;
+    if (updateIndex === true) {
+      await this.updateIndexedItem(obj, storage);
+    }
+
     return true;
+  }
+
+  public async updateIndexedItem(obj: O, storage: Storage<any>) {
+    await this.getIndex(storage);
+    (this._index as Index<O>)[obj.id] = obj;
   }
 
   public toStoreableObject(obj: O): any {
