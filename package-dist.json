@@ -1,26 +1,20 @@
 {
   "name": "sse-elements",
-  "version": "0.0.0-semantically-released",
-  "description": "Tools & widgets for implementing static site editor (structured data entry) frontend in Electron",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "repository": "git@github.com:riboseinc/sse-elements.git",
-  "author": "Anton Strogonoff <anton@strogonoff.name>",
-  "license": "MIT",
-  "scripts": {
-    "prepublish": "rm -rf dist; tsc; cp package-dist.json dist/package.json; rsync -avm --include='*.js' --include='*.scss' -f 'hide,! */' ./src/ ./dist"
-  },
+  "version": "0.0.5",
+  "main": "index.js",
+  "types": "index.d.ts",
+
   "peerDependencies": {
     "@blueprintjs/core": "^3.19.1",
     "@blueprintjs/icons": "^3.11.0",
     "css-loader": "^3.0.0",
+    "node-sass": "^4.12.0",
+    "sass-loader": "^7.1.0",
     "electron": "^5.0.4",
     "electron-webpack": "^2.7.4",
     "electron-webpack-ts": "^3.2.0",
-    "node-sass": "^4.12.0",
     "react": "^16.11.0",
     "react-dom": "^16.11.0",
-    "sass-loader": "^7.1.0",
     "typescript": "^3.6.4",
     "webpack": "~4.35.2"
   },
@@ -35,6 +29,7 @@
     "electron": "^5.0.4",
     "react": "^16.11.0",
     "react-dom": "^16.11.0",
+    "semantic-release": "^15.13.28",
     "typescript": "^3.6.4",
     "webpack": "~4.35.2"
   },
