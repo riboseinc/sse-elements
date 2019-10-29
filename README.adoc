@@ -1,4 +1,4 @@
-== Static site editor elements
+= Static site editor elements
 
 SSE (Static Site Editor) aims to simplify the creation of cross-platform
 user-friendly GUIs for editing static websites with Electron,
@@ -18,7 +18,7 @@ For example, `storage` contains code for handling Git repository interaction (ma
 and also offers a “data synchronizer” UI component (renderer-only).
 
 
-=== Architecture
+== Architecture
 
 The app is organized in a way where a lot of the functionality involves API calls
 between main and renderer threads. E.g., when a window needs to be opened,
@@ -26,7 +26,7 @@ renderer code (browser window) would call a main API endpoint, and main thread
 will launch the window as required.
 
 
-=== Provided modules
+== Provided modules
 
 At its current (fairly early) stage it consists of following components:
 
@@ -41,7 +41,7 @@ At its current (fairly early) stage it consists of following components:
 * `renderer/widgets`: Offers a set of Blueprint 3-based widgets
 
 
-=== Installation & usage
+== Installation & usage
 
 The project is not distributed through NPM currently.
 
@@ -57,7 +57,7 @@ Usage docs are coming, but for now you’re welcome to see
 how https://github.com/ituob/itu-ob-editor/[ITU OB editor app] uses this library.
 
 
-=== Contribution
+== Contribution
 
 === Authoring React components
 
@@ -101,7 +101,7 @@ For example:
 ----
 
 
-==== Release process
+=== Release process
 
 Make sure you have `gitkpg` globally installed (`yarn global add gitpkg`).
 
