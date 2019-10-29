@@ -1,13 +1,8 @@
 import * as fs from 'fs-extra';
-import * as path from 'path';
 
-import { app, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 
 import { YAMLStorage } from '../storage/main/yaml';
-
-
-const WORK_DIR = path.join(app.getPath('userData'));
-const SETTINGS_PATH = path.join(WORK_DIR, 'itu-ob-settings.yaml');
 
 
 export interface Pane {
@@ -27,12 +22,15 @@ export class Setting<T> {
 }
 
 
-class SettingManager {
+export class SettingManager {
   private registry: Setting<any>[] = [];
   private panes: Pane[] = [];
   private data: any | null = null;
+  private yaml: YAMLStorage;
 
-  constructor(private yaml: YAMLStorage) {}
+  constructor(public settingsPath: string) {
+    this.yaml = new YAMLStorage(fs);
+  }
 
   public async getValue(id: string): Promise<unknown> {
     const setting = this.get(id);
@@ -41,12 +39,12 @@ class SettingManager {
       if (this.data === null) {
         let settingsFileExists: boolean;
         try {
-          settingsFileExists = (await fs.stat(SETTINGS_PATH)).isFile();
+          settingsFileExists = (await fs.stat(this.settingsPath)).isFile();
         } catch (e) {
           settingsFileExists = false;
         }
         if (settingsFileExists) {
-          this.data = (await this.yaml.load(SETTINGS_PATH)) || {};
+          this.data = (await this.yaml.load(this.settingsPath)) || {};
         } else {
           this.data = {};
         }
@@ -75,8 +73,8 @@ class SettingManager {
   }
 
   private async commit() {
-    await fs.remove(SETTINGS_PATH);
-    await this.yaml.store(SETTINGS_PATH, this.data);
+    await fs.remove(this.settingsPath);
+    await this.yaml.store(this.settingsPath, this.data);
   }
 
   private get(id: string): Setting<any> | undefined {
@@ -112,6 +110,3 @@ class SettingManager {
     });
   }
 }
-
-
-export const manager = new SettingManager(new YAMLStorage(fs));
