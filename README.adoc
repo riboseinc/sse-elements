@@ -39,7 +39,7 @@ how https://github.com/ituob/itu-ob-editor/[ITU OB editor app] uses this library
 
 ==== Release process
 
-Make sure you have `gitkpg` globally installed.
+Make sure you have `gitkpg` globally installed (`yarn global add gitpkg`).
 
 From repository root:
 
