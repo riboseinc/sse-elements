@@ -1,0 +1,10 @@
+{
+  "name": "sse-elements",
+  "version": "0.0.0-semantically-released",
+  "description": "Tools & widgets for implementing static site editor (structured data entry) frontend in Electron",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "repository": "git@github.com:riboseinc/sse-elements.git",
+  "author": "Anton Strogonoff <anton@strogonoff.name>",
+  "license": "MIT"
+}
