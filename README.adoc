@@ -1,0 +1,52 @@
+== Static site editor elements
+
+SSE (Static Site Editor) aims to simplify the creation of cross-platform
+user-friendly GUIs for editing static websites with Electron,
+and provides an assortment of tools to that effect.
+
+SSE is based on React and Typescript. Its UI widgets build upon Blueprint 3,
+and it uses Isomorphic Git to provide collaboration tools.
+
+At its current (fairly early) stage it consists of following components:
+
+* `settings`: Manipulate application settings exposed to the user in some way
+* `localizer`: Work with data that is translatable in multiple languages
+* `storage`: Manipulate structured data, e.g. Jekyll posts or such, and synchronize it with upstream using VCS.
+  Currently supports YAML and Git
+* `preflight`: Check data for problems, which may help identify issues that would break site build
+* `spotlight`: Look up objects in the database
+* `api`: Offers tools for communication between Electron main and renderer processes through API endpoints
+* `main/window`: Offers tools for Electron window manipulation
+* `renderer/widgets`: Offers a set of Blueprint 3-based widgets
+
+
+=== Installation & usage
+
+The project is not distributed through NPM currently.
+
+Add the following runtime requirement to your package.json
+(for `current_version`, replace it with latest version per repository tags):
+
+[source]
+----
+"sse": "https://github.com/riboseinc/sse-elements#sse-elements-<current_version>-gitpkg",
+----
+
+Usage docs are coming, but for now you’re welcome to see
+how https://github.com/ituob/itu-ob-editor/[ITU OB editor app] uses this library.
+
+=== Contribution
+
+==== Release process
+
+Make sure you have `gitkpg` globally installed.
+
+From repository root:
+
+[source,sh]
+----
+# Edit dist/package-dist.json to increment version and (if changed) port dependencies from main packgage.json
+yarn prepublish
+cd dist
+gitpkg publish
+----
