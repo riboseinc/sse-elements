@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ipcRenderer } from 'electron';
-import { useTimeTravel, TimeTravel } from 'time-travel/renderer';
+import { useTimeTravel, TimeTravel } from '../time-travel/renderer';
 
 import { reviveJsonValue } from './utils';
 

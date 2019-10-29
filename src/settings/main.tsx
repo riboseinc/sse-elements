@@ -3,7 +3,7 @@ import * as path from 'path';
 
 import { app, ipcMain } from 'electron';
 
-import { YAMLStorage } from 'storage/main/yaml';
+import { YAMLStorage } from '../storage/main/yaml';
 
 
 const WORK_DIR = path.join(app.getPath('userData'));

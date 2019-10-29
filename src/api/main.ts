@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { openWindow } from 'main/window';
+import { openWindow } from '../main/window';
 
 import { reviveJsonValue } from './utils';
 

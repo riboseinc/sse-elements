@@ -1,5 +1,5 @@
 import { CheckerResults } from './types';
-import { Workspace } from 'storage/workspace';
+import { Workspace } from '../storage/workspace';
 
 
 interface PreflightChecker {

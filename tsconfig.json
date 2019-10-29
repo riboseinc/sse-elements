@@ -19,7 +19,6 @@
 
       "declaration": true,
       "outDir": "./dist",
-      "baseUrl": "./src",
       "jsx": "react"
     }
 }

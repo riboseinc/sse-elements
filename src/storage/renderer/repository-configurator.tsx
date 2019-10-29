@@ -2,7 +2,7 @@ import { URL } from 'url';
 import { remote } from 'electron';
 import React from 'react';
 import { FormGroup, InputGroup, Button } from '@blueprintjs/core';
-import { useSetting } from 'settings/renderer';
+import { useSetting } from '../../settings/renderer';
 
 
 interface RepositoryConfiguratorProps {

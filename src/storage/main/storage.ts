@@ -1,6 +1,6 @@
 import * as path from 'path';
 
-import { makeEndpoint } from 'api/main';
+import { makeEndpoint } from '../../api/main';
 
 import { Index, IndexableObject } from '../query';
 import { Workspace } from '../workspace';

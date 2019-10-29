@@ -2,8 +2,8 @@ import { remote, ipcRenderer } from 'electron';
 import React, { useEffect, useState } from 'react';
 import { H4, Collapse, Card, Label, InputGroup, FormGroup, TextArea, Callout, UL, Button } from '@blueprintjs/core';
 
-import { useWorkspaceRO } from 'api/renderer';
-import { useLocalStorage } from 'renderer/useLocalStorage';
+import { useWorkspaceRO } from '../../api/renderer';
+import { useLocalStorage } from '../../renderer/useLocalStorage';
 
 import { GitAuthor } from '../git';
 

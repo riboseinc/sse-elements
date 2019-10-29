@@ -4,9 +4,9 @@ import * as git from 'isomorphic-git';
 
 import { ipcMain } from 'electron';
 
-import { makeEndpoint } from 'api/main';
-import { Setting, manager as settings } from 'settings/main';
-import { WindowOpenerParams, openWindow } from 'main/window';
+import { makeEndpoint } from '../../api/main';
+import { Setting, manager as settings } from '../../settings/main';
+import { WindowOpenerParams, openWindow } from '../../main/window';
 
 import { GitAuthor, GitAuthentication } from '../git';
 
