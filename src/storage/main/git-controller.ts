@@ -5,22 +5,10 @@ import * as git from 'isomorphic-git';
 import { ipcMain } from 'electron';
 
 import { makeEndpoint } from '../../api/main';
-import { Setting, manager as settings } from '../../settings/main';
+import { Setting, SettingManager } from '../../settings/main';
 import { WindowOpenerParams, openWindow } from '../../main/window';
 
 import { GitAuthor, GitAuthentication } from '../git';
-
-
-settings.configurePane({
-  id: 'dataSync',
-  label: "Data synchronization",
-  icon: 'git-merge',
-});
-settings.register(new Setting<string>(
-  'gitRepoUrl',
-  "Git repository URL",
-  'dataSync',
-));
 
 
 export class GitController {
@@ -30,9 +18,22 @@ export class GitController {
       private fs: any,
       private repoUrl: string,
       private workDir: string,
-      private corsProxy: string) {
+      private corsProxy: string,
+      private settings: SettingManager) {
 
     git.plugins.set('fs', fs);
+
+    this.settings.configurePane({
+      id: 'dataSync',
+      label: "Data synchronization",
+      icon: 'git-merge',
+    });
+
+    this.settings.register(new Setting<string>(
+      'gitRepoUrl',
+      "Git repository URL",
+      'dataSync',
+    ));
   }
 
   async getAuthor(): Promise<GitAuthor> {
@@ -198,9 +199,10 @@ export class GitController {
 export async function initRepo(
     workDir: string,
     repoUrl: string,
-    corsProxyUrl: string): Promise<GitController> {
+    corsProxyUrl: string,
+    settings: SettingManager): Promise<GitController> {
 
-  const gitCtrl = new GitController(fs, repoUrl, workDir, corsProxyUrl);
+  const gitCtrl = new GitController(fs, repoUrl, workDir, corsProxyUrl, settings);
 
   if ((await gitCtrl.isInitialized()) === true) {
     const remoteUrl = await gitCtrl.getOriginUrl();
@@ -222,7 +224,9 @@ export async function initRepo(
    opens a window with specified options.
    The window is expected to ask the user to specify the URL and send a `'set-setting'`
    event for `'gitRepoUrl'`. */
-export async function setRepoUrl(configWindow: WindowOpenerParams): Promise<string> {
+export async function setRepoUrl(
+    configWindow: WindowOpenerParams,
+    settings: SettingManager): Promise<string> {
   const repoUrl: string = await settings.getValue('gitRepoUrl') as string;
 
   return new Promise<string>(async (resolve, reject) => {
