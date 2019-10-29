@@ -18,22 +18,9 @@ export class GitController {
       private fs: any,
       private repoUrl: string,
       private workDir: string,
-      private corsProxy: string,
-      private settings: SettingManager) {
+      private corsProxy: string) {
 
     git.plugins.set('fs', fs);
-
-    this.settings.configurePane({
-      id: 'dataSync',
-      label: "Data synchronization",
-      icon: 'git-merge',
-    });
-
-    this.settings.register(new Setting<string>(
-      'gitRepoUrl',
-      "Git repository URL",
-      'dataSync',
-    ));
   }
 
   async getAuthor(): Promise<GitAuthor> {
@@ -202,7 +189,19 @@ export async function initRepo(
     corsProxyUrl: string,
     settings: SettingManager): Promise<GitController> {
 
-  const gitCtrl = new GitController(fs, repoUrl, workDir, corsProxyUrl, settings);
+  settings.configurePane({
+    id: 'dataSync',
+    label: "Data synchronization",
+    icon: 'git-merge',
+  });
+
+  settings.register(new Setting<string>(
+    'gitRepoUrl',
+    "Git repository URL",
+    'dataSync',
+  ));
+
+  const gitCtrl = new GitController(fs, repoUrl, workDir, corsProxyUrl);
 
   if ((await gitCtrl.isInitialized()) === true) {
     const remoteUrl = await gitCtrl.getOriginUrl();
