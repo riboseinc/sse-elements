@@ -8,7 +8,6 @@
   "author": "Anton Strogonoff <anton@strogonoff.name>",
   "license": "MIT",
   "scripts": {
-    "semantic-release": "semantic-release",
     "prepublish": "tsc"
   },
   "peerDependencies": {
@@ -36,7 +35,6 @@
     "electron": "^5.0.4",
     "react": "^16.11.0",
     "react-dom": "^16.11.0",
-    "semantic-release": "^15.13.28",
     "typescript": "^3.6.4",
     "webpack": "~4.35.2"
   },
