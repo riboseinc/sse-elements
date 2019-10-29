@@ -1,0 +1,1 @@
+{"version":3,"file":"renderer.js","sourceRoot":"","sources":["../../src/spotlight/renderer.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,MAAM,OAAO,CAAC;AAE1B,MAAM,CAAC,MAAM,SAAS,GAAiB;IACrC,OAAO,4CAAiB,CAAC;AAC3B,CAAC,CAAA","sourcesContent":["import React from 'react';\n\nexport const Spotlight: React.FC<{}> = function () {\n  return <p>Spotlight!</p>;\n}\n"]}

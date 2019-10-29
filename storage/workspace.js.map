@@ -1,0 +1,1 @@
+{"version":3,"file":"workspace.js","sourceRoot":"","sources":["../../src/storage/workspace.ts"],"names":[],"mappings":"","sourcesContent":["import { Index, IndexableObject } from './query';\n\nexport type Workspace = { [indexName: string]: Index<IndexableObject> }\n\n"]}

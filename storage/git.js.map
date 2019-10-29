@@ -1,0 +1,1 @@
+{"version":3,"file":"git.js","sourceRoot":"","sources":["../../src/storage/git.ts"],"names":[],"mappings":"","sourcesContent":["export interface GitAuthentication {\n  oauth2format?: 'github' | 'gitlab' | 'bitbucket',\n  token?: string,\n  username?: string,\n  password?: string,\n}\n\n\nexport interface GitAuthor {\n  name?: string,\n  email?: string,\n}"]}
