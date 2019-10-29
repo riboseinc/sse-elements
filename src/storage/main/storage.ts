@@ -12,7 +12,7 @@ const YAML_EXT = '.yaml';
 
 
 export abstract class StoreManager<O extends IndexableObject> {
-  private _index: Index<O> | undefined = undefined;
+  protected _index: Index<O> | undefined = undefined;
 
   constructor(public rootDir: string) {}
 
