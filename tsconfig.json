@@ -1,9 +1,25 @@
 {
     "compilerOptions": {
-      "target": "es6",
-      "module": "commonjs",
+      "target": "es2017",
+      "module": "esnext",
+      "moduleResolution": "node",
+
+      "strict": true,
+      "noUnusedLocals": true,
+      "noFallthroughCasesInSwitch": true,
+      "noImplicitReturns": true,
+
+      "inlineSources": true,
+      "inlineSourceMap": true,
+
+      "allowSyntheticDefaultImports": true,
+      "experimentalDecorators": true,
+
+      "newLine": "lf",
+
       "declaration": true,
       "outDir": "./dist",
-      "strict": true
+      "baseUrl": "./src",
+      "jsx": "react"
     }
 }
