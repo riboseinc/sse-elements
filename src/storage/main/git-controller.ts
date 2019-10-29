@@ -186,20 +186,7 @@ export class GitController {
 export async function initRepo(
     workDir: string,
     repoUrl: string,
-    corsProxyUrl: string,
-    settings: SettingManager): Promise<GitController> {
-
-  settings.configurePane({
-    id: 'dataSync',
-    label: "Data synchronization",
-    icon: 'git-merge',
-  });
-
-  settings.register(new Setting<string>(
-    'gitRepoUrl',
-    "Git repository URL",
-    'dataSync',
-  ));
+    corsProxyUrl: string): Promise<GitController> {
 
   const gitCtrl = new GitController(fs, repoUrl, workDir, corsProxyUrl);
 
@@ -226,6 +213,19 @@ export async function initRepo(
 export async function setRepoUrl(
     configWindow: WindowOpenerParams,
     settings: SettingManager): Promise<string> {
+
+  settings.configurePane({
+    id: 'dataSync',
+    label: "Data synchronization",
+    icon: 'git-merge',
+  });
+
+  settings.register(new Setting<string>(
+    'gitRepoUrl',
+    "Git repository URL",
+    'dataSync',
+  ));
+
   const repoUrl: string = await settings.getValue('gitRepoUrl') as string;
 
   return new Promise<string>(async (resolve, reject) => {
