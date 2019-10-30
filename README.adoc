@@ -62,7 +62,55 @@ how https://github.com/ituob/itu-ob-editor/[ITU OB editor app] uses this library
 === Authoring React components
 
 The convention is to use functional components.
+
+[source,tsx]
+----
+interface MyWidgetProps {
+  someProp: SomeType,
+  // ...
+}
+export const MyWidget: React.FC<MyWidgetProps> = function ({ someProp }) {
+  return <p>{someProp.toLowerCase()}</p>;
+};
+----
+
+==== Styling React components
+
 Styling is kept in `styles.scss` files next to each component.
+
+For example, in `/src/renderer/my_component/index.tsx`:
+
+[source,tsx]
+----
+import styles from './styles.scss';
+
+export const MyComponent: React.FC<{}> = function () {
+  return <p className={styles.myParagraphClassName}>Paragraph text…</p>
+};
+----
+
+…and in `/src/renderer/my_component/styles.scss`:
+
+[source,scss]
+----
+@import "~@blueprintjs/core/lib/scss/variables";
+
+:local .myParagraphClassName {
+  color: $pt-text-color;
+}
+----
+
+To access CSS selectors provided by Blueprint within your local selectors,
+use `:global` notation. For example:
+
+[source,scss]
+----
+:local .myParagraphClassName {
+  :global .bp3-active {
+    // ...
+  }
+}
+----
 
 ==== Assigning SCSS classes in React components
 
