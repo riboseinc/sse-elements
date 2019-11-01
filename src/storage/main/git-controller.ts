@@ -148,6 +148,11 @@ export class GitController {
         gitPassword: string
       }) => {
 
+      const changedFiles = await this.listChangedFiles();
+      if (changedFiles.length < 1) {
+        return { errors: ["No changes to submit!"] };
+      }
+
       await this.setAuthor({ name: authorName, email: authorEmail });
 
       try {
@@ -156,19 +161,14 @@ export class GitController {
         return { errors: [`Error while authenticating: ${e.toString()}`] };
       }
 
+      await this.addAllChanges();
+      await this.commit(commitMsg);
+
       try {
         await this.pull();
       } catch (e) {
         return { errors: [`Error while fetching and merging changes: ${e.toString()}`] };
       }
-
-      const changedFiles = await this.listChangedFiles();
-      if (changedFiles.length < 1) {
-        return { errors: ["No changes to submit!"] };
-      }
-
-      await this.addAllChanges();
-      await this.commit(commitMsg);
 
       try {
         await this.push();
