@@ -217,7 +217,8 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function () {
             icon="git-merge"
             intent="primary"
             large={true}
-            disabled={complete === false || started === true}
+            disabled={complete === false}
+            loading={started === true}
             title="Fetch other site editors’ changes, and submit yours"
             onClick={handleSyncAction}>Merge Changes</Button>
         </Card>
