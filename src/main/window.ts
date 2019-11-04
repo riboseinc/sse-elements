@@ -27,13 +27,14 @@ export interface WindowOpenerParams {
   frameless?: boolean,
   winParams?: any,
   menuTemplate?: MenuItemConstructorOptions[],
+  ignoreCache?: boolean,
 }
 export type WindowOpener = (props: WindowOpenerParams) => Promise<BrowserWindow>;
 export const openWindow: WindowOpener = async ({
     title,
     url, component, componentParams,
     dimensions, frameless,
-    winParams, menuTemplate }) => {
+    winParams, menuTemplate, ignoreCache }) => {
 
   if ((component || '').trim() === '' && (url || '').trim() === '') {
     throw new Error("openWindow() requires either `component` or `url`");
@@ -65,7 +66,7 @@ export const openWindow: WindowOpener = async ({
     const params = `c=${component}&${componentParams ? componentParams : ''}`;
     window = await createWindowForLocalComponent(title, params, _winParams);
   } else if (url) {
-    window = await createWindow(title, url, _winParams);
+    window = await createWindow(title, url, _winParams, ignoreCache);
   } else {
     throw new Error("Either component or url must be given to openWindow()");
   }
@@ -130,7 +131,7 @@ function createWindowForLocalComponent(title: string, params: string, winParams:
 }
 
 
-function createWindow(title: string, url: string, winParams: any): Promise<BrowserWindow> {
+function createWindow(title: string, url: string, winParams: any, ignoreCache: boolean = false): Promise<BrowserWindow> {
   const window = new BrowserWindow({
     webPreferences: {nodeIntegration: true},
     title: title,
@@ -149,7 +150,12 @@ function createWindow(title: string, url: string, winParams: any): Promise<Brows
     window.webContents.openDevTools();
   }
 
-  window.loadURL(url);
+  if (ignoreCache) {
+    console.debug("Opening window ignoring cache");
+    window.loadURL(url, {'extraHeaders': 'pragma: no-cache\n'});
+  } else {
+    window.loadURL(url);
+  }
 
   window.webContents.on('devtools-opened', () => {
     window.focus();
