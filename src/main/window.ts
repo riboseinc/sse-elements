@@ -47,7 +47,6 @@ export const openWindow: WindowOpener = async ({
   }
 
   const _framelessOpts = {
-    frame: isMacOS ? true : false,
     titleBarStyle: isMacOS ? 'hiddenInset' : undefined,
   };
 
