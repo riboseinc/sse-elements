@@ -2,8 +2,8 @@
 
 :local .addCardTriggerContainer {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%) translateY(-50%);
+  left: .75rem;
+  transform: translateY(-50%);
   z-index: 4;
 
   &:hover {
@@ -12,13 +12,17 @@
 
   .addCardTrigger {
     border-radius: 100% !important;
-    background: white !important;
-
     transform: scale(0.6);
 
     &:hover {
       transform: scale(0.8);
     }
+  }
+
+  .addCardTriggerHighlighted {
+    border-radius: .5rem !important;
+    transform: scale(0.8);
+    transform-origin: left center;
   }
 
   // Hack to preserve external class name

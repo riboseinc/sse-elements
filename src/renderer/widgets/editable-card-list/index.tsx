@@ -3,18 +3,33 @@ import { Card, Text, Button } from '@blueprintjs/core';
 import styles from './styles.scss';
 
 
-export const AddCardTrigger: React.FC<{ onClick?: (...args: any[]) => void }> = function ({ onClick }) {
+interface AddCardTriggerProps {
+  onClick?: (...args: any[]) => void,
+  highlight?: boolean,
+  label?: string | JSX.Element,
+}
+
+
+export const AddCardTrigger: React.FC<AddCardTriggerProps> = function ({ onClick, highlight, label }) {
   return (
     <div className={styles.addCardTriggerContainer}>
-      <AddCardTriggerButton onClick={onClick} />
+      <AddCardTriggerButton onClick={onClick} highlight={highlight} label={label} />
     </div>
   );
 };
 
 
 // If using separately from AddCardTrigger, wrap into element with addCardTriggerContainer class
-export const AddCardTriggerButton: React.FC<{ onClick?: (...args: any[]) => void }> = function ({ onClick }) {
-  return <Button icon="plus" onClick={onClick} className={styles.addCardTrigger} />;
+export const AddCardTriggerButton: React.FC<AddCardTriggerProps> = function ({ onClick, highlight, label }) {
+  return <Button
+    icon="plus"
+    onClick={onClick}
+    text={highlight ? (label || undefined) : undefined}
+    minimal={highlight ? true : undefined}
+    title={label ? label.toString() : ""}
+    intent={highlight ? "primary" : undefined}
+    className={`${styles.addCardTrigger} ${highlight ? styles.addCardTriggerHighlighted : ''}`}
+  />;
 };
 
 
