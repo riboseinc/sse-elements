@@ -134,6 +134,10 @@ export class GitController {
       };
     });
 
+    makeEndpoint<{ filenames: string[] }>('list-local-changes', async () => {
+      return { filenames: await this.listChangedFiles() };
+    });
+
     makeEndpoint<{ errors: string[] }>('fetch-commit-push', async ({
         commitMsg,
         authorName,
