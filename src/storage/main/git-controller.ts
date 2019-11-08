@@ -197,7 +197,10 @@ export async function initRepo(
   if ((await gitCtrl.isInitialized()) === true) {
     const remoteUrl = await gitCtrl.getOriginUrl();
     if (remoteUrl !== null && remoteUrl.trim() === repoUrl.trim()) {
-      await gitCtrl.pull();
+      const changedFiles = await gitCtrl.listChangedFiles();
+      if (changedFiles.length < 1) {
+        await gitCtrl.pull();
+      }
     } else {
       await gitCtrl.reset();
     }
