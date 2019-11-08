@@ -55,7 +55,7 @@ export class YAMLStorage {
           noCompatMode: true,
         });
       } catch (e) {
-        console.error(`Failed to save ${filePath} with ${JSON.stringify(newData)}`);
+        console.error(`Failed to save ${filePath} with ${JSON.stringify(newData)}`, e);
         return;
       }
 
