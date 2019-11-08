@@ -150,7 +150,6 @@ function createWindow(title: string, url: string, winParams: any, ignoreCache: b
   }
 
   if (ignoreCache) {
-    console.debug("Opening window ignoring cache");
     window.loadURL(url, {'extraHeaders': 'pragma: no-cache\n'});
   } else {
     window.loadURL(url);
