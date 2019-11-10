@@ -216,11 +216,12 @@ export class GitController {
 export async function initRepo(
     workDir: string,
     repoUrl: string,
-    corsProxyUrl: string): Promise<GitController> {
+    corsProxyUrl: string,
+    forceReset: boolean): Promise<GitController> {
 
   const gitCtrl = new GitController(fs, repoUrl, workDir, corsProxyUrl);
 
-  if ((await gitCtrl.isInitialized()) === true) {
+  if ((await gitCtrl.isInitialized()) === true && forceReset === false) {
     log.verbose("SSE: GitController: Already initialized");
 
     const remoteUrl = await gitCtrl.getOriginUrl();
@@ -239,7 +240,8 @@ export async function initRepo(
       await gitCtrl.reset();
     }
   } else {
-    log.warn("SSE: GitController: Not yet initialized, resetting");
+    log.warn("SSE: GitController: Resetting");
+    log.debug(`SSE: GitController: forceReset is ${forceReset}`);
     await gitCtrl.reset();
   }
 
@@ -247,14 +249,17 @@ export async function initRepo(
 }
 
 
-/* Promises to return a string containing configured repository URL.
+/* Promises to return an object containing string with repository URL
+   and a flag indicating whether it’s been reset
+   (which if true would cause `initRepo()` to reinitialize the repository).
+
    If repository URL is not configured (e.g., on first run, or after reset)
-   opens a window with specified options.
+   opens a window with specified options to ask the user to provide the setting.
    The window is expected to ask the user to specify the URL and send a `'set-setting'`
    event for `'gitRepoUrl'`. */
 export async function setRepoUrl(
     configWindow: WindowOpenerParams,
-    settings: SettingManager): Promise<string> {
+    settings: SettingManager): Promise<{ url: string, hasChanged: boolean }> {
 
   settings.configurePane({
     id: 'dataSync',
@@ -270,8 +275,11 @@ export async function setRepoUrl(
 
   const repoUrl: string = await settings.getValue('gitRepoUrl') as string;
 
-  return new Promise<string>(async (resolve, reject) => {
-    if (!repoUrl) {
+  if (repoUrl) {
+    log.warn("SSE: GitController: Repo URL found in settings, skip config window");
+    return Promise.resolve({ url: repoUrl, hasChanged: false });
+  } else {
+    return new Promise<{ url: string, hasChanged: boolean }>(async (resolve, reject) => {
       log.warn("SSE: GitController: Repo URL not set, open initial config window to let user configure");
 
       await openWindow(configWindow);
@@ -281,13 +289,10 @@ export async function setRepoUrl(
         if (name === 'gitRepoUrl') {
           log.warn("SSE: GitController: received gitRepoUrl setting");
           ipcMain.removeListener('set-setting', handleSetting);
-          resolve(value);
+          resolve({ url: value, hasChanged: true });
         }
         evt.reply('ok');
       }
-    } else {
-      log.warn("SSE: GitController: Repo URL found in settings, skip config window");
-      resolve(repoUrl);
-    }
-  });
+    });
+  }
 }
