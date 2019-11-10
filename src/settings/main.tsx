@@ -1,4 +1,5 @@
 import * as fs from 'fs-extra';
+import * as log from 'electron-log';
 
 import { ipcMain } from 'electron';
 
@@ -29,6 +30,7 @@ export class SettingManager {
   private yaml: YAMLStorage;
 
   constructor(public settingsPath: string) {
+    log.debug(`SSE: Settings: Configuring settings with path ${settingsPath}`);
     this.yaml = new YAMLStorage(fs);
   }
 
@@ -52,11 +54,16 @@ export class SettingManager {
       const rawVal = this.data[id];
       return rawVal !== undefined ? setting.toUseable(rawVal) : undefined;
     } else {
+      log.warn(`SSE: Settings: Attempted to get value for non-existent setting ${id}`);
       throw new Error(`Setting to get value for is not found: ${id}`);
     }
   }
 
   public async setValue(id: string, val: unknown) {
+    // DANGER: Never log setting’s val in raw form
+
+    log.debug(`SSE: Settings: Set value for setting ${id}`);
+
     const setting = this.get(id);
     if (setting) {
       const storeable = setting.toStoreable(val);
@@ -68,12 +75,16 @@ export class SettingManager {
   }
 
   public async deleteValue(id: string) {
+    log.debug(`SSE: Settings: Delete setting: ${id}`);
     delete this.data[id];
     await this.commit();
   }
 
   private async commit() {
+    log.info("SSE: Settings: Commit new settings");
+    log.debug("SSE: Settings: Commit: Remove file");
     await fs.remove(this.settingsPath);
+    log.debug("SSE: Settings: Commit: Write new file");
     await this.yaml.store(this.settingsPath, this.data);
   }
 
@@ -82,6 +93,7 @@ export class SettingManager {
   }
 
   public register(setting: Setting<any>) {
+    log.debug("SSE: Settings: Register setting");
     if (this.panes.find(p => p.id === setting.paneId)) {
       this.registry.push(setting);
 
@@ -95,6 +107,8 @@ export class SettingManager {
   }
 
   public setUpAPIEndpoints() {
+    log.verbose("SSE: Settings: Configure API endpoints");
+
     ipcMain.on('set-setting', (evt: any, name: string, value: any) => {
       return this.setValue(name, value);
     });
@@ -105,6 +119,8 @@ export class SettingManager {
     });
 
     ipcMain.on('clear-setting', async (evt: any, name: string) => {
+      log.debug(`SSE: Settings: received clear-setting request for ${name}`);
+
       await this.deleteValue(name);
       evt.reply('ok');
     });
