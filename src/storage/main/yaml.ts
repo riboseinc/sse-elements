@@ -1,3 +1,4 @@
+import * as log from 'electron-log';
 import * as yaml from 'js-yaml';
 import { customTimestampType } from './yaml-custom-ts';
 
@@ -6,6 +7,7 @@ export class YAMLStorage {
   constructor(private fs: any) { }
 
   public async load(filePath: string): Promise<any> {
+    log.debug(`SSE: YAMLStorage: Loading ${filePath}`);
     const data: string = await this.fs.readFile(filePath, { encoding: 'utf8' });
     return yaml.load(data, { schema: SCHEMA });
   }
@@ -30,6 +32,9 @@ export class YAMLStorage {
   }
 
   public async store(filePath: string, data: any): Promise<any> {
+    log.debug(`SSE: YAMLStorage: Storing ${filePath}`);
+    log.silly(`SSE: YAMLStorage: Storing ${filePath}: ${JSON.stringify(data)}`);
+
     if (data !== undefined && data !== null) {
       // Merge new data into old data; this way if some YAML properties
       // are not supported we will not lose them after the update.
@@ -39,8 +44,11 @@ export class YAMLStorage {
 
       try {
         oldData = await this.loadIfExists(filePath);
+        log.silly(`SSE: YAMLStorage: Storing ${filePath}: Already existing data: ${oldData}`);
         newData = Object.assign(oldData, data);
+        log.silly(`SSE: YAMLStorage: Storing ${filePath}: Combined data to write: ${newData}`);
       } catch (e) {
+        log.error(`SSE: YAMLStorage: Failed to store ${filePath}`);
         console.error("Bad input", filePath, oldData, data);
         throw e;
       }
@@ -55,6 +63,7 @@ export class YAMLStorage {
           noCompatMode: true,
         });
       } catch (e) {
+        log.error(`SSE: YAMLStorage: Failed to dump ${filePath}: ${JSON.stringify(data)}`);
         console.error(`Failed to save ${filePath} with ${JSON.stringify(newData)}`, e);
         return;
       }
@@ -66,9 +75,12 @@ export class YAMLStorage {
       //   console.debug(`Replacing contents of ${filePath}`, oldContents, newContents);
       // }
 
+      log.debug(`SSE: YAMLStorage: Storing ${filePath}: Writing file`);
+      log.silly(`SSE: YAMLStorage: Storing ${filePath}: Writing file: ${newContents}`);
       await this.fs.writeFile(filePath, newContents, { encoding: 'utf8' });
       return data;
     } else {
+      log.info(`SSE: YAMLStorage: Storing ${filePath}: Empty data given, removing file`);
       await this.fs.remove(filePath);
     }
   }

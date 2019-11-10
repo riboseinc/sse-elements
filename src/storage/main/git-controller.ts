@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs-extra';
 import * as git from 'isomorphic-git';
+import * as log from 'electron-log';
 
 import { ipcMain } from 'electron';
 
@@ -30,11 +31,14 @@ export class GitController {
   }
 
   async setAuthor(author: GitAuthor) {
+    log.verbose("SSE: GitController: Set author");
     await git.config({ dir: this.workDir, path: 'user.name', value: author.name });
     await git.config({ dir: this.workDir, path: 'user.email', value: author.email });
   }
 
   async setAuth(auth: GitAuthentication): Promise<boolean> {
+    // DANGER: never log `auth` value here!
+    log.verbose("SSE: GitController: Set auth");
     try {
       // Try fetching with auth; will throw if auth is invalid
       git.fetch({dir: this.workDir, ...auth });
@@ -71,6 +75,7 @@ export class GitController {
   }
 
   async addAllChanges() {
+    log.verbose("SSE: GitController: Adding all changes");
     await git.add({
       dir: this.workDir,
       filepath: '.',
@@ -86,6 +91,7 @@ export class GitController {
   }
 
   async pull() {
+    log.verbose("SSE: GitController: Pulling with auto fast-forward merge");
     await git.pull({
       dir: this.workDir,
       ref: 'master',
@@ -96,6 +102,7 @@ export class GitController {
   }
 
   async commit(msg: string) {
+    log.verbose("SSE: GitController: Committing");
     await git.commit({
       dir: this.workDir,
       message: msg,
@@ -104,6 +111,7 @@ export class GitController {
   }
 
   async push() {
+    log.verbose("SSE: GitController: Pushing");
     await git.push({
       dir: this.workDir,
       remote: 'origin',
@@ -112,8 +120,17 @@ export class GitController {
   }
 
   async reset() {
+    log.verbose("SSE: GitController: Resetting");
+    log.silly("SSE: GitController: Reset: Removing data directory");
+
     await this.fs.remove(this.workDir);
+
+    log.silly("SSE: GitController: Reset: Ensuring data directory exists");
+
     await this.fs.ensureDir(this.workDir);
+
+    log.silly("SSE: GitController: Reset: Cloning");
+
     await git.clone({
       dir: this.workDir,
       url: this.repoUrl,
@@ -126,8 +143,10 @@ export class GitController {
   }
 
   setUpAPIEndpoints() {
+    log.verbose("SSE: GitController: Setting up API endpoints");
 
     makeEndpoint<{ originURL: string | null, author: GitAuthor }>('git-config', async () => {
+      log.verbose("SSE: GitController: received git-config request");
       return {
         originURL: await this.getOriginUrl(),
         author: await this.getAuthor(),
@@ -135,6 +154,7 @@ export class GitController {
     });
 
     makeEndpoint<{ filenames: string[] }>('list-local-changes', async () => {
+      log.verbose("SSE: GitController: received list-local-changes request");
       return { filenames: await this.listChangedFiles() };
     });
 
@@ -151,6 +171,10 @@ export class GitController {
         gitUsername: string,
         gitPassword: string
       }) => {
+
+      // DANGER: Never log gitUsername & gitPassword values
+
+      log.verbose("SSE: GitController: received fetch-commit-push request");
 
       const changedFiles = await this.listChangedFiles();
       if (changedFiles.length < 1) {
@@ -171,12 +195,14 @@ export class GitController {
       try {
         await this.pull();
       } catch (e) {
+        log.warn("SSE: GitController: Failed to pull & merge changes!");
         return { errors: [`Error while fetching and merging changes: ${e.toString()}`] };
       }
 
       try {
         await this.push();
       } catch (e) {
+        log.warn("SSE: GitController: Failed to push changes!");
         return { errors: [`Error while pushing changes: ${e.toString()}`] };
       }
 
@@ -195,16 +221,25 @@ export async function initRepo(
   const gitCtrl = new GitController(fs, repoUrl, workDir, corsProxyUrl);
 
   if ((await gitCtrl.isInitialized()) === true) {
+    log.verbose("SSE: GitController: Already initialized");
+
     const remoteUrl = await gitCtrl.getOriginUrl();
     if (remoteUrl !== null && remoteUrl.trim() === repoUrl.trim()) {
+      log.verbose("SSE: GitController: Current remote URL matches configured repo URL");
       const changedFiles = await gitCtrl.listChangedFiles();
       if (changedFiles.length < 1) {
+        log.verbose("SSE: GitController: There are no local changes, let’s pull");
         await gitCtrl.pull();
+      } else {
+        log.verbose("SSE: GitController: There are some local changes, not pulling");
       }
     } else {
+      log.warn("SSE: GitController: Current remote URL does NOT match configured repo URL");
+      log.warn("SSE: GitController: Resetting");
       await gitCtrl.reset();
     }
   } else {
+    log.warn("SSE: GitController: Not yet initialized, resetting");
     await gitCtrl.reset();
   }
 
@@ -237,17 +272,21 @@ export async function setRepoUrl(
 
   return new Promise<string>(async (resolve, reject) => {
     if (!repoUrl) {
+      log.warn("SSE: GitController: Repo URL not set, open initial config window to let user configure");
+
       await openWindow(configWindow);
       ipcMain.on('set-setting', handleSetting);
 
       function handleSetting(evt: any, name: string, value: string) {
         if (name === 'gitRepoUrl') {
+          log.warn("SSE: GitController: received gitRepoUrl setting");
           ipcMain.removeListener('set-setting', handleSetting);
           resolve(value);
         }
         evt.reply('ok');
       }
     } else {
+      log.warn("SSE: GitController: Repo URL found in settings, skip config window");
       resolve(repoUrl);
     }
   });

@@ -15,6 +15,7 @@
     "@blueprintjs/icons": "^3.11.0",
     "css-loader": "^3.0.0",
     "electron": "^5.0.4",
+    "electron-log": "^3.0.9",
     "electron-webpack": "^2.7.4",
     "electron-webpack-ts": "^3.2.0",
     "node-sass": "^4.12.0",

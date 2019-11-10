@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as log from 'electron-log';
 
 import { makeEndpoint } from '../../api/main';
 
@@ -17,6 +18,8 @@ export abstract class StoreManager<O extends IndexableObject> {
   constructor(public rootDir: string) {}
 
   public async storeIndex(storage: Storage<any>, newIdx: Index<O> | undefined): Promise<boolean> {
+    log.debug(`SSE: StorageManager for ${this.rootDir}: Storing index`);
+
     const idx: Index<O> = newIdx || await this.getIndex(storage);
     const items: O[] = Object.values(idx);
 
@@ -74,6 +77,9 @@ export abstract class StoreManager<O extends IndexableObject> {
 
   // Stores object in DB
   public async store(obj: O, storage: Storage<any>, updateIndex = true): Promise<boolean> {
+    log.debug(`SSE: StorageManager for ${this.rootDir}: Storing object ${obj.id}`);
+    log.silly(`SSE: StorageManager for ${this.rootDir}: Storing object ${obj.id}: ${JSON.stringify(obj)}`);
+
     const objDir = path.join(this.rootDir, `${obj.id}`);
     const objPath = path.join(storage.workDir, objDir);
     const storeable = this.toStoreableObject(obj);
@@ -85,6 +91,7 @@ export abstract class StoreManager<O extends IndexableObject> {
     }
 
     if (updateIndex === true) {
+      log.debug(`SSE: StorageManager for ${this.rootDir}: Storing object ${obj.id}: Updating index`);
       await this.updateIndexedItem(obj, storage);
     }
 
@@ -178,6 +185,8 @@ export abstract class Storage<W extends Workspace> {
   }
 
   setUpAPIEndpoints(notifier: (notify: string[]) => void) {
+    log.verbose("SSE: Storage: Setting API endpoints");
+
     for (let indexName of Object.keys(this.workspace)) {
 
       makeEndpoint<Index<any>>(`storage-${indexName}-all`, async () => {
