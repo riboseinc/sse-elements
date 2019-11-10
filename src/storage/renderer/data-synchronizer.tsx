@@ -82,7 +82,7 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function () {
   async function handleResetURL() {
     await ipcRenderer.send('clear-setting', 'gitRepoUrl');
     remote.app.relaunch();
-    remote.app.quit();
+    remote.app.exit(0);
   }
 
   const complete = (
