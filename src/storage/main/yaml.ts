@@ -3,11 +3,22 @@ import * as yaml from 'js-yaml';
 import { customTimestampType } from './yaml-custom-ts';
 
 
+interface YAMLStorageOptions {
+  debugLog: boolean;
+}
+
+
 export class YAMLStorage {
-  constructor(private fs: any) { }
+  constructor(private fs: any, private opts: YAMLStorageOptions = { debugLog: false }) { }
+
+  private debugLog(message: string, level: 'silly' | 'debug' = 'debug') {
+    if (this.opts.debugLog) {
+      log[level](message);
+    }
+  }
 
   public async load(filePath: string): Promise<any> {
-    log.debug(`SSE: YAMLStorage: Loading ${filePath}`);
+    this.debugLog(`SSE: YAMLStorage: Loading ${filePath}`);
     const data: string = await this.fs.readFile(filePath, { encoding: 'utf8' });
     return yaml.load(data, { schema: SCHEMA });
   }
@@ -32,8 +43,8 @@ export class YAMLStorage {
   }
 
   public async store(filePath: string, data: any): Promise<any> {
-    log.debug(`SSE: YAMLStorage: Storing ${filePath}`);
-    log.silly(`SSE: YAMLStorage: Storing ${filePath}: ${JSON.stringify(data)}`);
+    this.debugLog(`SSE: YAMLStorage: Storing ${filePath}`)
+    this.debugLog(`SSE: YAMLStorage: Storing ${filePath}: ${JSON.stringify(data)}`, 'silly');
 
     if (data !== undefined && data !== null) {
       // Merge new data into old data; this way if some YAML properties
@@ -44,9 +55,9 @@ export class YAMLStorage {
 
       try {
         oldData = await this.loadIfExists(filePath);
-        log.silly(`SSE: YAMLStorage: Storing ${filePath}: Already existing data: ${oldData}`);
+        this.debugLog(`SSE: YAMLStorage: Storing ${filePath}: Already existing data: ${oldData}`, 'silly');
         newData = Object.assign(oldData, data);
-        log.silly(`SSE: YAMLStorage: Storing ${filePath}: Combined data to write: ${newData}`);
+        this.debugLog(`SSE: YAMLStorage: Storing ${filePath}: Combined data to write: ${newData}`, 'silly');
       } catch (e) {
         log.error(`SSE: YAMLStorage: Failed to store ${filePath}`);
         console.error("Bad input", filePath, oldData, data);
@@ -75,8 +86,8 @@ export class YAMLStorage {
       //   console.debug(`Replacing contents of ${filePath}`, oldContents, newContents);
       // }
 
-      log.debug(`SSE: YAMLStorage: Storing ${filePath}: Writing file`);
-      log.silly(`SSE: YAMLStorage: Storing ${filePath}: Writing file: ${newContents}`);
+      this.debugLog(`SSE: YAMLStorage: Storing ${filePath}: Writing file`);
+      this.debugLog(`SSE: YAMLStorage: Storing ${filePath}: Writing file: ${newContents}`, 'silly');
       await this.fs.writeFile(filePath, newContents, { encoding: 'utf8' });
       return data;
     } else {
