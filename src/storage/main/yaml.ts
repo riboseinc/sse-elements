@@ -91,7 +91,7 @@ export class YAMLStorage {
       await this.fs.writeFile(filePath, newContents, { encoding: 'utf8' });
       return data;
     } else {
-      log.info(`SSE: YAMLStorage: Storing ${filePath}: Empty data given, removing file`);
+      this.debugLog(`SSE: YAMLStorage: Storing ${filePath}: Empty data given, removing file`);
       await this.fs.remove(filePath);
     }
   }
