@@ -77,8 +77,8 @@ export abstract class StoreManager<O extends IndexableObject> {
 
   // Stores object in DB
   public async store(obj: O, storage: Storage<any>, updateIndex = true): Promise<boolean> {
-    log.debug(`SSE: StorageManager for ${this.rootDir}: Storing object ${obj.id}`);
-    log.silly(`SSE: StorageManager for ${this.rootDir}: Storing object ${obj.id}: ${JSON.stringify(obj)}`);
+    //log.debug(`SSE: StorageManager for ${this.rootDir}: Storing object ${obj.id}`);
+    //log.silly(`SSE: StorageManager for ${this.rootDir}: Storing object ${obj.id}: ${JSON.stringify(obj)}`);
 
     const objDir = path.join(this.rootDir, `${obj.id}`);
     const objPath = path.join(storage.workDir, objDir);
@@ -91,7 +91,7 @@ export abstract class StoreManager<O extends IndexableObject> {
     }
 
     if (updateIndex === true) {
-      log.debug(`SSE: StorageManager for ${this.rootDir}: Storing object ${obj.id}: Updating index`);
+      //log.debug(`SSE: StorageManager for ${this.rootDir}: Storing object ${obj.id}: Updating index`);
       await this.updateIndexedItem(obj, storage);
     }
 
