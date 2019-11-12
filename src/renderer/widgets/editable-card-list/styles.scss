@@ -6,10 +6,6 @@
   transform: translateY(-50%);
   z-index: 4;
 
-  &:hover {
-    cursor: pointer;
-  }
-
   .addCardTrigger {
     border-radius: 100% !important;
     transform: scale(0.6);
@@ -47,12 +43,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-:local .editableCardSelectable {
-  &:hover {
-    cursor: pointer;
-  }
 }
 
 :local .editableCardDeletable {
