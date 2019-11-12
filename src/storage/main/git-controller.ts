@@ -5,7 +5,7 @@ import * as log from 'electron-log';
 
 import { ipcMain } from 'electron';
 
-import { makeEndpoint } from '../../api/main';
+import { listen } from '../../api/main';
 import { Setting, SettingManager } from '../../settings/main';
 import { WindowOpenerParams, openWindow } from '../../main/window';
 
@@ -145,7 +145,7 @@ export class GitController {
   setUpAPIEndpoints() {
     log.verbose("SSE: GitController: Setting up API endpoints");
 
-    makeEndpoint<{ originURL: string | null, author: GitAuthor }>('git-config', async () => {
+    listen<{}, { originURL: string | null, author: GitAuthor }>('git-config', async () => {
       log.verbose("SSE: GitController: received git-config request");
       return {
         originURL: await this.getOriginUrl(),
@@ -153,24 +153,20 @@ export class GitController {
       };
     });
 
-    makeEndpoint<{ filenames: string[] }>('list-local-changes', async () => {
+    listen<{}, { filenames: string[] }>('list-local-changes', async () => {
       log.verbose("SSE: GitController: received list-local-changes request");
       return { filenames: await this.listChangedFiles() };
     });
 
-    makeEndpoint<{ errors: string[] }>('fetch-commit-push', async ({
-        commitMsg,
-        authorName,
-        authorEmail,
-        gitUsername,
-        gitPassword,
-      }: {
-        commitMsg: string,
-        authorName: string,
-        authorEmail: string,
-        gitUsername: string,
-        gitPassword: string
-      }) => {
+    type SubmitChangesEndpointParameters = {
+      commitMsg: string,
+      authorName: string,
+      authorEmail: string,
+      gitUsername: string,
+      gitPassword: string,
+    };
+    listen<SubmitChangesEndpointParameters, { errors: string[] }>
+    ('fetch-commit-push', async ({ commitMsg, authorName, authorEmail, gitUsername, gitPassword }) => {
 
       // DANGER: Never log gitUsername & gitPassword values
 

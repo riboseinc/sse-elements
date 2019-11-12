@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as log from 'electron-log';
 
-import { makeEndpoint } from '../../api/main';
+import { listen } from '../../api/main';
 
 import { Index, IndexableObject } from '../query';
 import { Workspace } from '../workspace';
@@ -61,7 +61,12 @@ export abstract class StoreManager<O extends IndexableObject> {
 
     for (const dir of dirs) {
       if (dir != '.DS_Store') {
-        const objData = await storage.loadObject(path.join(rootPath, dir));
+        let objData: any;
+        try {
+          objData = await storage.loadObject(path.join(rootPath, dir));
+        } catch (e) {
+          log.error(`Failed to load object from ${dir} when loading index ${this.rootDir}`);
+        }
         if (objData) {
           const obj: O = this.postLoad(objData);
           if (obj.id) {
@@ -138,6 +143,7 @@ export abstract class Storage<W extends Workspace> {
   public abstract async findObjects(query?: string): Promise<W>
 
   public async loadWorkspace(): Promise<void> {
+    // Loads workspace object with an index for each store manager
     this.workspace = await Object.keys(this.storeManagers).reduce(async (objP: Promise<any>, key: string) => {
       const obj = await objP;
       obj[key] = await this.storeManagers[key].getIndex(this);
@@ -167,7 +173,7 @@ export abstract class Storage<W extends Workspace> {
     if (!metaFileIsFile) {
       return undefined;
     }
-    objData = await this.yaml.load(metaFile);
+    objData = await this.yaml.load(metaFile) || {};
 
     const dirContents = await this.fs.readdir(path.join(this.workDir, objDir));
     for (const item of dirContents) {
@@ -189,24 +195,32 @@ export abstract class Storage<W extends Workspace> {
 
     for (let indexName of Object.keys(this.workspace)) {
 
-      makeEndpoint<Index<any>>(`storage-${indexName}-all`, async () => {
+      listen<{}, Index<any>>
+      (`storage-get-all-${indexName}`, async () => {
         return this.workspace[indexName];
-      }, async ({ newData, notify }) => {
-        await this.storeManagers[indexName].storeIndex(this, newData);
-        notifier([indexName, ...(notify || [])]);
       });
 
-      makeEndpoint<IndexableObject>(`storage-${indexName}`, async ({ objectId }: { objectId: string }) => {
-        return this.workspace[indexName][objectId];
-      }, async ({ newData, notify }) => {
+      listen<{ objectId: string }, IndexableObject>
+      (`storage-get-one-in-${indexName}`, async ({ objectId }) => {
+        return this.workspace[indexName][objectId] || null;
+      });
+
+      listen<{ objectId: string, newData: IndexableObject  }, { success: boolean }>
+      (`storage-store-one-in-${indexName}`, async ({ objectId, newData }) => {
         await this.storeManagers[indexName].store(newData, this);
-        notifier([indexName, ...(notify || [])]);
+        notifier([indexName]);
+        return { success: true };
       });
 
-      makeEndpoint<boolean>(`storage-${indexName}-delete`, async ({ objectId }: { objectId: string }) => {
+      listen<{ objectId: string }, { success: boolean }>
+      (`storage-delete-one-in-${indexName}`, async ({ objectId }) => {
         delete this.workspace[indexName][objectId];
+
+        // TODO: WARNING: Race condition, since storing the whole index may take a little while
         await this.storeManagers[indexName].storeIndex(this, this.workspace[indexName]);
-        return true;
+
+        notifier([indexName]);
+        return { success: true };
       });
 
     }

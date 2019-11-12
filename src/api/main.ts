@@ -1,47 +1,59 @@
+/* Simple API on top of Electron’s IPC framework, the `main` side.
+   Provides functions for handling API requests to fetch/store data and/or open window. */
+
+import * as log from 'electron-log';
+
 import { ipcMain } from 'electron';
-import { openWindow } from '../main/window';
+import { openWindow, WindowOpenerParams } from '../main/window';
 
-import { reviveJsonValue } from './utils';
+import { APIResponse, reviveJsonValue, getEventNamesForEndpoint, getEventNamesForWindowEndpoint } from './utils';
 
 
-type Saver<I> = (input: I) => Promise<void>;
-type Fetcher<O> = (params: any) => Promise<O>;
+type Handler<I, O> = (params: I) => Promise<O>;
+export function listen<I, O>(name: string, handler: Handler<I, O>) {
+  /* Defines an API endpoint with I input and O output types.
+     Takes endpoint name and handler function.
 
-export function makeEndpoint<T>(name: string, fetcher: Fetcher<T>, saver?: Saver<{ newData: T, notify?: string[] }>) {
-  ipcMain.on(`request-workspace-${name}`, async (evt: any, params?: string, newObj?: string) => {
-    // TODO: Electron should be handling JSON [de]serialization for us, refactor!
+     Handler is expected to be an async function
+     that takes deserialized input params and returns the output.
+
+     The endpoint handles input deserialization,
+     wrapping the output in response object { errors: string[], result: O },
+     and response serialization. */
+
+  const eventNames = getEventNamesForEndpoint(name);
+
+  ipcMain.on(eventNames.request, async (evt: any, rawInput?: string) => {
+    let response: APIResponse<O>;
+
+    // We may be able to switch to JSON’s own (de)serialization behavior
+    // if we find a way to plug our bespoke `reviveJsonValue`.
+    const input: I = JSON.parse(rawInput || '{}', reviveJsonValue);
+
+    try {
+      response = { errors: [], result: await handler(input) };
+    } catch (e) {
+      log.error(`SSE: API: Error handling request to ${name}! ${e.name}: ${e.message}`);
+      response = { errors: [`${e.message}`], result: undefined };
+      return;
+    }
+
+    log.debug(`SSE: API: handled request to ${name}`);
+
+    evt.reply(eventNames.response, JSON.stringify(response));
+  });
+}
+
+
+export function makeWindowEndpoint(name: string, getWindowOpts: (params: any) => WindowOpenerParams): void {
+  const eventNames = getEventNamesForWindowEndpoint(name);
+
+  ipcMain.on(eventNames.request, async (evt: any, params?: string) => {
     const parsedParams: any = JSON.parse(params || '{}', reviveJsonValue);
-    let result: any;
-
-    if (saver && newObj) {
-      await saver(JSON.parse(newObj, reviveJsonValue));
-    }
-
-    if (fetcher) {
-      result = await fetcher(parsedParams);
-    } else {
-      result = { success: true };
-    }
-
-    evt.reply(`workspace-${name}`, JSON.stringify(result));
-  });
-}
-
-
-export function makeWriteOnlyEndpoint(name: string, dataSaver: (...args: any[]) => void): void {
-  ipcMain.on(`store-workspace-${name}`, (evt: any, ...args: string[]) => {
-    const parsedArgs: any[] = args.map(val => JSON.parse(val, reviveJsonValue));
-    dataSaver(...parsedArgs);
-  });
-}
-
-
-export function makeWindowEndpoint(name: string, getWindowOpts: (...args: string[]) => any): void {
-  ipcMain.on(`open-${name}`, async (evt: any, ...args: string[]) => {
-    await openWindow(getWindowOpts(...args));
+    await openWindow(getWindowOpts(parsedParams));
 
     const result = JSON.stringify({ errors: [] });
     evt.returnValue = result;
-    evt.reply(`open-${name}-done`, result);
+    evt.reply(eventNames.response, result);
   });
 }

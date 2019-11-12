@@ -2,7 +2,7 @@ import { remote, ipcRenderer } from 'electron';
 import React, { useEffect, useState } from 'react';
 import { H4, Collapse, Card, Label, InputGroup, FormGroup, TextArea, Callout, UL, Button } from '@blueprintjs/core';
 
-import { useWorkspaceRO } from '../../api/renderer';
+import { request } from '../../api/renderer';
 import { useLocalStorage } from '../../renderer/useLocalStorage';
 
 import { GitAuthor } from '../git';
@@ -11,6 +11,8 @@ import styles from './data-synchronizer.scss';
 
 
 const API_ENDPOINT = 'fetch-commit-push';
+
+type RepoConfig = { author: GitAuthor, originURL: string | null | undefined };
 
 
 interface DataSynchronizerProps {}
@@ -25,9 +27,18 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function () {
   const [repoConfigOpenState, updateRepoConfigOpenState] = useState(false);
   const [repoConfigComplete, updateRepoConfigComplete] = useState(false);
 
-  const repoCfg = useWorkspaceRO<{ author: GitAuthor, originURL: string | null | undefined }>(
-    'git-config',
-    { originURL: undefined, author: {} });
+  const [repoCfg, updateRepoCfg] = useState({ originURL: undefined, author: {} } as RepoConfig);
+
+  async function fetchRepoConfig() {
+    console.debug("Getting repo config");
+    const repoCfg = await request<RepoConfig>('git-config');
+    console.debug("Got repo config", repoCfg);
+    updateRepoCfg(repoCfg);
+  }
+
+  useEffect(() => {
+    fetchRepoConfig();
+  }, []);
 
   useEffect(() => {
     if (repoCfg.originURL !== undefined) {
@@ -50,33 +61,28 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function () {
   if (authorName.trim() === '' && repoCfg.author.name !== undefined) { setAuthorName(repoCfg.author.name); }
   if (authorEmail.trim() === '' && repoCfg.author.email !== undefined) { setAuthorEmail(repoCfg.author.email); }
 
-  function handleResult(evt: any, rawData: string) {
-    ipcRenderer.removeListener(`workspace-${API_ENDPOINT}`, handleResult);
-    const data: any = JSON.parse(rawData);
-    setStarted(false);
-    setFinished(true);
-    setErrors(data.errors);
-
-    if (data.errors.length < 1) {
-      setCommitMsg('');
-    }
-  }
-
-  function handleSyncAction() {
-    updateRepoConfigOpenState(false);
-    setErrors([]);
-    ipcRenderer.on(`workspace-${API_ENDPOINT}`, handleResult);
-    ipcRenderer.send(
-      `request-workspace-${API_ENDPOINT}`,
-      JSON.stringify({
-        commitMsg,
-        authorName,
-        authorEmail,
-        gitUsername: username,
-        gitPassword: password,
-      }));
+  async function handleSyncAction() {
     setFinished(false);
     setStarted(true);
+    setErrors([]);
+
+    updateRepoConfigOpenState(false);
+
+    const result = await request<{ errors: string[] }>(API_ENDPOINT, {
+      commitMsg,
+      authorName,
+      authorEmail,
+      gitUsername: username,
+      gitPassword: password,
+    });
+
+    setErrors(result.errors);
+    if (result.errors.length < 1) {
+      setCommitMsg('');
+    }
+
+    setStarted(false);
+    setFinished(true);
   }
 
   async function handleResetURL() {

@@ -8,3 +8,16 @@ export function reviveJsonValue(key: string, val: any) {
   }
   return val;
 }
+
+
+export type APIResponse<O> = { errors: string[], result: O | undefined };
+
+
+export function getEventNamesForEndpoint(endpointName: string): { request: string, response: string } {
+  return { request: `_api-${endpointName}-request`, response: `_api-${endpointName}-response` };
+}
+
+
+export function getEventNamesForWindowEndpoint(endpointName: string): { request: string, response: string } {
+  return { request: `_open-${endpointName}-request`, response: `_open-${endpointName}-response` };
+}
