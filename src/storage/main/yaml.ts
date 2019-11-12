@@ -8,6 +8,7 @@ interface YAMLStorageOptions {
 }
 
 
+// TODO: Should probably implement locking to avoid race conditions on writes (#4)
 export class YAMLStorage {
   constructor(private fs: any, private opts: YAMLStorageOptions = { debugLog: false }) { }
 
