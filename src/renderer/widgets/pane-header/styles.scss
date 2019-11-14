@@ -47,7 +47,7 @@
 
 :local .paneHeaderMinor {
   height: $pt-navbar-height / 1.5;
-  font-size: 85%;
+  font-size: $pt-font-size-small;
 }
 
 :local .paneHeaderAlignedLeft {
