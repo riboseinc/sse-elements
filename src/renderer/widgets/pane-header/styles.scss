@@ -1,7 +1,7 @@
 @import "~@blueprintjs/core/lib/scss/variables";
 
 :local .paneHeader {
-  padding: 0 20px;
+  $sidePadding: 20px;
   height: $pt-navbar-height;
   display: flex;
   flex-flow: row nowrap;
@@ -14,6 +14,30 @@
   color: $pt-text-color-disabled;
 
   -webkit-app-region: drag;
+
+  .title {
+    padding: 0 0 0 $sidePadding;
+  }
+  .title:last-child {
+    padding-right: $sidePadding;
+  }
+  .actions {
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: flex-end;
+
+    :global .bp3-button:first-child:not(.big-icon-button) {
+      margin-left: $sidePadding / 2;
+    }
+    :global .bp3-button:last-child:not(.big-icon-button) {
+      margin-right: $sidePadding / 2;
+    }
+    :global .big-icon-button {
+      height: $pt-navbar-height;
+      width: $pt-navbar-height;
+      border-radius: 0;
+    }
+  }
 }
 
 :local .paneHeaderMajor {
@@ -28,6 +52,9 @@
 
 :local .paneHeaderAlignedLeft {
   justify-content: flex-start;
+  .actions {
+    flex: 1;
+  }
 }
 
 :local .paneHeaderAlignedRight {

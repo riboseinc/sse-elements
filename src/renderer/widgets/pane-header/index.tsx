@@ -1,4 +1,5 @@
 import React from 'react';
+import { Text } from '@blueprintjs/core';
 import styles from './styles.scss';
 
 
@@ -7,6 +8,7 @@ interface PaneHeaderProps {
   minor?: boolean,
   align?: 'left' | 'right',
   className?: string,
+  actions?: JSX.Element,
 }
 export const PaneHeader: React.FC<PaneHeaderProps> = function (props) {
   let alignmentClass: string;
@@ -25,6 +27,16 @@ export const PaneHeader: React.FC<PaneHeaderProps> = function (props) {
       ${props.className ? props.className : ''}
       ${props.major ? styles.paneHeaderMajor : ''}
       ${props.minor ? styles.paneHeaderMinor : ''}
-    `}>{props.children}</h2>
+    `}>
+
+      <Text className={styles.title} ellipsize={true}>
+        {props.children}
+      </Text>
+
+      {props.actions
+        ? <div className={styles.actions}>{props.actions}</div>
+        : null}
+
+    </h2>
   )
 };
