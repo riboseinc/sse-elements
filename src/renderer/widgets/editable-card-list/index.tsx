@@ -38,14 +38,16 @@ interface SimpleEditableCardProps {
   icon?: IconName,
   selected?: boolean,
   onDelete?: () => void,
-  onSelect?: () => void 
-  extended?: boolean;
+  onSelect?: () => void,
+  minimal?: boolean,
+  extended?: boolean,
 }
 export const SimpleEditableCard: React.FC<SimpleEditableCardProps> = function (props) {
   return (
     <Card
         className={`
           ${styles.editableCard}
+          ${props.minimal ? styles.editableCardMinimal : ''}
           ${props.selected ? styles.editableCardSelected : ''}
           ${props.extended ? styles.editableCardExtended : ''}
           ${props.onSelect ? styles.editableCardSelectable : ''}

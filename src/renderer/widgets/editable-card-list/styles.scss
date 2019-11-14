@@ -45,14 +45,20 @@
   text-overflow: ellipsis;
 }
 
-:local .editableCardDeletable {
-  $deleteButtonW: 4em;
+:local .editableCardMinimal {
+  height: $pt-navbar-height / 1.5;
+  padding: 0 20px !important;
+  background: none !important;
+  box-shadow: none !important;
+  font-size: 85%;
+}
 
-  padding-right: $deleteButtonW + .5em !important;
+:local .editableCardDeletable {
+  padding-right: $pt-navbar-height + 10px !important;
 
   .editableCardDeleteButton {
     height: $pt-navbar-height;
-    width: $deleteButtonW;
+    width: $pt-navbar-height;
 
     position: absolute;
     top: 0;
@@ -60,6 +66,34 @@
     border-radius: 0 !important;
     box-shadow: none !important;
     padding: 0 .5em !important;
+
+    filter: grayscale(100%);
+    opacity: 0.4;
+
+    &:hover {
+      filter: none;
+      opacity: 1;
+    }
+  }
+
+  &.editableCardMinimal {
+    padding-right: 20px !important;
+
+    .editableCardDeleteButton {
+      display: none;
+      height: $pt-navbar-height / 1.5;
+      width: $pt-navbar-height / 1.5;
+    }
+
+    &:hover {
+      padding-right: ($pt-navbar-height / 1.5) + 10px !important;
+
+      .editableCardDeleteButton {
+        display: inherit;
+        height: $pt-navbar-height / 1.5;
+        width: $pt-navbar-height / 1.5;
+      }
+    }
   }
 }
 
