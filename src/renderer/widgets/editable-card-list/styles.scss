@@ -61,6 +61,12 @@
   background: none !important;
   box-shadow: none !important;
   font-size: 85%;
+
+:local .editableCardInteractive {
+  &:hover {
+    cursor: pointer;
+    background: $pt-text-selection-color;
+  }
 }
 
 :local .editableCardDeletable {

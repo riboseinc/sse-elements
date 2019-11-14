@@ -39,6 +39,7 @@ interface SimpleEditableCardProps {
   selected?: boolean,
   onDelete?: () => void,
   onSelect?: () => void,
+  onClick?: () => void,
   minimal?: boolean,
   extended?: boolean,
   contentsClassName?: string,
@@ -66,10 +67,11 @@ export const SimpleEditableCard: React.FC<SimpleEditableCardProps> = function (p
           ${props.selected ? styles.editableCardSelected : ''}
           ${props.extended ? styles.editableCardExtended : ''}
           ${props.onSelect ? styles.editableCardSelectable : ''}
+          ${props.onClick ? styles.editableCardInteractive : ''}
           ${props.onDelete ? styles.editableCardDeletable : ''}
           ${props.className || ''}
         `}
-        onClick={props.onSelect}>
+        onClick={props.onClick || props.onSelect}>
 
       {props.icon
         ? <><Icon icon={props.icon} />&ensp;</>
