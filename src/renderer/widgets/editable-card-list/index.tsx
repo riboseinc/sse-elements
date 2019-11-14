@@ -41,8 +41,23 @@ interface SimpleEditableCardProps {
   onSelect?: () => void,
   minimal?: boolean,
   extended?: boolean,
+  contentsClassName?: string,
+  className?: string,
 }
 export const SimpleEditableCard: React.FC<SimpleEditableCardProps> = function (props) {
+  let contents: JSX.Element;
+  const contentsClassName = `${styles.cardContents} ${props.contentsClassName || ''}`;
+
+  if (props.extended) {
+    contents = <div className={contentsClassName}>{props.children}</div>;
+  } else {
+    contents = (
+      <Text ellipsize={true} className={contentsClassName}>
+        {props.children}
+      </Text>
+    );
+  }
+
   return (
     <Card
         className={`
@@ -52,6 +67,7 @@ export const SimpleEditableCard: React.FC<SimpleEditableCardProps> = function (p
           ${props.extended ? styles.editableCardExtended : ''}
           ${props.onSelect ? styles.editableCardSelectable : ''}
           ${props.onDelete ? styles.editableCardDeletable : ''}
+          ${props.className || ''}
         `}
         onClick={props.onSelect}>
 
@@ -59,9 +75,7 @@ export const SimpleEditableCard: React.FC<SimpleEditableCardProps> = function (p
         ? <><Icon icon={props.icon} />&ensp;</>
         : null}
 
-      <Text ellipsize={true}>
-        {props.children}
-      </Text>
+      {contents}
 
       {props.onDelete
         ? <Button
