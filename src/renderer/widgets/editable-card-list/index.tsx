@@ -71,7 +71,8 @@ export const SimpleEditableCard: React.FC<SimpleEditableCardProps> = function (p
               return false;
             }}
             intent="danger"
-            icon="cross"
+            icon="delete"
+            title="Delete this item"
             className={styles.editableCardDeleteButton}
             minimal={true}
             small={true}

@@ -1,24 +1,30 @@
 @import "~@blueprintjs/core/lib/scss/variables";
 
 :local .addCardTriggerContainer {
-  position: absolute;
-  left: .75rem;
-  transform: translateY(-50%);
-  z-index: 4;
-
   .addCardTrigger {
+    position: absolute;
+    left: .75rem;
+    transform: scale(0.6) translateY(-80%);
+    z-index: 4;
+
     border-radius: 100% !important;
-    transform: scale(0.6);
 
     &:hover {
-      transform: scale(0.8);
+      transform: scale(0.8) translateY(-60%);
     }
   }
 
   .addCardTriggerHighlighted {
+    font-size: 85%;
+    margin-left: .75rem;
+    position: static;
     border-radius: .5rem !important;
-    transform: scale(0.8);
+    transform: none;
     transform-origin: left center;
+
+    &:hover {
+      transform: none;
+    }
   }
 
   // Hack to preserve external class name
