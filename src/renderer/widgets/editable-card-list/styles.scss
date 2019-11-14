@@ -18,7 +18,7 @@
     font-size: 85%;
     margin-left: .75rem;
     position: static;
-    border-radius: .5rem !important;
+    border-radius: $pt-border-radius !important;
     transform: none;
     transform-origin: left center;
 
@@ -60,7 +60,8 @@
   padding: 0 20px !important;
   background: none !important;
   box-shadow: none !important;
-  font-size: 85%;
+  font-size: $pt-font-size-small;
+}
 
 :local .editableCardInteractive {
   &:hover {
