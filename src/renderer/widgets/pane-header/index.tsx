@@ -3,7 +3,8 @@ import styles from './styles.scss';
 
 
 interface PaneHeaderProps {
-  loud?: boolean,
+  major?: boolean,
+  minor?: boolean,
   align?: 'left' | 'right',
   className?: string,
 }
@@ -22,7 +23,8 @@ export const PaneHeader: React.FC<PaneHeaderProps> = function (props) {
       ${styles.paneHeader}
       ${alignmentClass}
       ${props.className ? props.className : ''}
-      ${props.loud ? styles.paneHeaderLoud : ''}
+      ${props.major ? styles.paneHeaderMajor : ''}
+      ${props.minor ? styles.paneHeaderMinor : ''}
     `}>{props.children}</h2>
   )
 };

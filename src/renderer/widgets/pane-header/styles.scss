@@ -10,16 +10,20 @@
   font-size: 100%;
 
   margin: 0;
-  text-transform: uppercase;
 
   color: $pt-text-color-disabled;
 
   -webkit-app-region: drag;
 }
 
-:local .paneHeaderLoud {
+:local .paneHeaderMajor {
   color: $pt-text-color-muted;
-  text-transform: unset;
+  text-transform: uppercase;
+}
+
+:local .paneHeaderMinor {
+  height: $pt-navbar-height / 1.5;
+  font-size: 85%;
 }
 
 :local .paneHeaderAlignedLeft {
