@@ -1,5 +1,6 @@
 import React from 'react';
-import { Card, Text, Button } from '@blueprintjs/core';
+import { Icon, Card, Text, Button } from '@blueprintjs/core';
+import { IconName } from '@blueprintjs/icons';
 import styles from './styles.scss';
 
 
@@ -34,6 +35,7 @@ export const AddCardTriggerButton: React.FC<AddCardTriggerProps> = function ({ o
 
 
 interface SimpleEditableCardProps {
+  icon?: IconName,
   selected?: boolean,
   onDelete?: () => void,
   onSelect?: () => void 
@@ -50,6 +52,10 @@ export const SimpleEditableCard: React.FC<SimpleEditableCardProps> = function (p
           ${props.onDelete ? styles.editableCardDeletable : ''}
         `}
         onClick={props.onSelect}>
+
+      {props.icon
+        ? <><Icon icon={props.icon} />&ensp;</>
+        : null}
 
       <Text ellipsize={true}>
         {props.children}
