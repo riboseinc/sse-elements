@@ -77,7 +77,7 @@ export const SimpleEditableCard: React.FC<SimpleEditableCardProps> = function (p
             minimal={true}
             small={true}
           />
-        : ''}
+        : null}
 
     </Card>
   );
