@@ -12,12 +12,17 @@ import { WindowOpenerParams, openWindow } from '../../main/window';
 import { GitAuthor, GitAuthentication } from '../git';
 
 
+const UPSTREAM_REMOTE = 'upstream';
+const MAIN_REMOTE = 'origin';
+
+
 export class GitController {
   private auth: GitAuthentication = {};
 
   constructor(
       private fs: any,
       private repoUrl: string,
+      private upstreamRepoUrl: string,
       private workDir: string,
       private corsProxy: string) {
 
@@ -62,18 +67,6 @@ export class GitController {
     return gitInitialized;
   }
 
-  async getOriginUrl(): Promise<string | null> {
-    return ((await git.listRemotes({
-      dir: this.workDir,
-    })).find(r => r.remote === 'origin') || { url: null }).url;
-  }
-
-  async getUpstreamUrl(): Promise<string | null> {
-    return ((await git.listRemotes({
-      dir: this.workDir,
-    })).find(r => r.remote === 'upstream') || { url: null }).url;
-  }
-
   async addAllChanges() {
     log.verbose("SSE: GitController: Adding all changes");
     await git.add({
@@ -110,26 +103,27 @@ export class GitController {
     });
   }
 
-  async push() {
+  async push(force = false) {
     log.verbose("SSE: GitController: Pushing");
     await git.push({
       dir: this.workDir,
-      remote: 'origin',
+      remote: MAIN_REMOTE,
+      force: force,
       ...this.auth,
     });
   }
 
-  async reset() {
-    log.verbose("SSE: GitController: Resetting");
-    log.silly("SSE: GitController: Reset: Removing data directory");
+  async forceInitialize() {
+    log.warn("SSE: GitController: Force initializing");
+    log.warn("SSE: GitController: Initialize: Removing data directory");
 
     await this.fs.remove(this.workDir);
 
-    log.silly("SSE: GitController: Reset: Ensuring data directory exists");
+    log.silly("SSE: GitController: Initialize: Ensuring data directory exists");
 
     await this.fs.ensureDir(this.workDir);
 
-    log.silly("SSE: GitController: Reset: Cloning");
+    log.verbose("SSE: GitController: Initialize: Cloning");
 
     await git.clone({
       dir: this.workDir,
@@ -140,7 +134,76 @@ export class GitController {
       corsProxy: this.corsProxy,
       ...this.auth,
     });
+
+    await git.addRemote({
+      dir: this.workDir,
+      remote: UPSTREAM_REMOTE,
+      url: this.upstreamRepoUrl,
+    });
   }
+
+
+  /* Fork/upstream workflow.
+
+     Operates two remotes, origin (for author’s individual fork) and upstream.
+
+     Allows to reset to upstream.
+
+     WARNING: resetting to upstream will cause data loss
+     if fork (origin) happens to be ahead of upstream
+     (have changes not incorporated into upstream).
+
+     Does not handle incorporating changes from the fork into upstream.
+     The author is expected to create a pull request from their fork to upstream
+     using hosted Git service GUI.
+  */
+
+  async getOriginUrl(): Promise<string | null> {
+    return ((await git.listRemotes({
+      dir: this.workDir,
+    })).find(r => r.remote === MAIN_REMOTE) || { url: null }).url;
+  }
+
+  async getUpstreamUrl(): Promise<string | null> {
+    return ((await git.listRemotes({
+      dir: this.workDir,
+    })).find(r => r.remote === UPSTREAM_REMOTE) || { url: null }).url;
+  }
+
+  async isAheadOfUpstream(): Promise<boolean> {
+
+    // If we have local changes, we’re definitely ahead
+    const filesLocallyModified = await this.listChangedFiles();
+    if (filesLocallyModified.length > 0) {
+      return true;
+    }
+
+    // Otherwise, consider us ahead if latest upstream commit is a descendant of our current HEAD
+    await git.fetch({ dir: this.workDir, remote: UPSTREAM_REMOTE });
+    const headRef = await git.resolveRef({ dir: this.workDir, ref: 'HEAD' });
+    const latestUpstreamRef = await git.resolveRef({ dir: this.workDir, ref: `${UPSTREAM_REMOTE}/master` });
+    return await git.isDescendent({ dir: this.workDir, oid: latestUpstreamRef, ancestor: headRef, depth: -1 });
+
+  }
+
+  async resetToUpstream(): Promise<{ success: boolean }> {
+    const gitDir = path.join(this.workDir, '.git');
+
+    await git.fetch({ dir: this.workDir, remote: UPSTREAM_REMOTE });
+    const latestUpstreamRef = await git.resolveRef({ dir: this.workDir, ref: `${UPSTREAM_REMOTE}/master` });
+
+    // Equivalent of resetting repo to given commit
+    await fs.writeFile(path.join(gitDir, 'refs', 'heads', 'master'), latestUpstreamRef);
+    await fs.unlink(path.join(gitDir, 'index'));
+
+    await git.checkout({ dir: this.workDir, ref: 'master' });
+    await this.push(true);
+
+    return { success: true };
+  }
+
+
+  /* API setup */
 
   setUpAPIEndpoints() {
     log.verbose("SSE: GitController: Setting up API endpoints");
@@ -212,12 +275,13 @@ export class GitController {
 export async function initRepo(
     workDir: string,
     repoUrl: string,
+    upstreamRepoUrl: string,
     corsProxyUrl: string,
-    forceReset: boolean): Promise<GitController> {
+    force: boolean): Promise<GitController> {
 
-  const gitCtrl = new GitController(fs, repoUrl, workDir, corsProxyUrl);
+  const gitCtrl = new GitController(fs, repoUrl, upstreamRepoUrl, workDir, corsProxyUrl);
 
-  if ((await gitCtrl.isInitialized()) === true && forceReset === false) {
+  if ((await gitCtrl.isInitialized()) === true && force === false) {
     log.verbose("SSE: GitController: Already initialized");
 
     const remoteUrl = await gitCtrl.getOriginUrl();
@@ -232,13 +296,11 @@ export async function initRepo(
       }
     } else {
       log.warn("SSE: GitController: Current remote URL does NOT match configured repo URL");
-      log.warn("SSE: GitController: Resetting");
-      await gitCtrl.reset();
+      await gitCtrl.forceInitialize();
     }
   } else {
-    log.warn("SSE: GitController: Resetting");
-    log.debug(`SSE: GitController: forceReset is ${forceReset}`);
-    await gitCtrl.reset();
+    log.debug(`SSE: GitController: force is ${force}`);
+    await gitCtrl.forceInitialize();
   }
 
   return gitCtrl;
