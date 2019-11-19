@@ -1,39 +1,51 @@
 import { remote, ipcRenderer } from 'electron';
+import { clipboard } from 'electron';
+
 import React, { useEffect, useState } from 'react';
-import { H4, Collapse, Card, Label, InputGroup, FormGroup, TextArea, Callout, UL, Button } from '@blueprintjs/core';
+import { H4, Card, Label, InputGroup, FormGroup, Callout, Button } from '@blueprintjs/core';
 
+import { useSetting } from '../../settings/renderer';
 import { request } from '../../api/renderer';
-import { useLocalStorage } from '../../renderer/useLocalStorage';
-
-import { GitAuthor } from '../git';
 
 import styles from './data-synchronizer.scss';
 
 
-const API_ENDPOINT = 'fetch-commit-push';
+type RepoConfig = {
+  originURL: string | null | undefined,
+  name: string | null | undefined,
+  email: string | null | undefined,
+  username: string | null | undefined,
+};
 
-type RepoConfig = { author: GitAuthor, originURL: string | null | undefined };
 
-
-interface DataSynchronizerProps {}
-export const DataSynchronizer: React.FC<DataSynchronizerProps> = function () {
-  const [username, setUsername] = useLocalStorage('gitUsername', '');
-  const [password, setPassword] = useLocalStorage('gitPassword', '');
-
-  const [commitMsg, setCommitMsg] = useState('');
-  const [authorName, setAuthorName] = useState('');
-  const [authorEmail, setAuthorEmail] = useState('');
+interface DataSynchronizerProps {
+  upstreamURL: string,
+  inPreLaunchSetup: boolean,
+}
+export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ upstreamURL, inPreLaunchSetup }) {
+  const [username, setUsername] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
 
   const [repoConfigOpenState, updateRepoConfigOpenState] = useState(false);
   const [repoConfigComplete, updateRepoConfigComplete] = useState(false);
 
-  const [repoCfg, updateRepoCfg] = useState({ originURL: undefined, author: {} } as RepoConfig);
+  const [repoCfg, updateRepoCfg] = useState({
+    originURL: undefined,
+    name: undefined,
+    email: undefined,
+    username: undefined,
+  } as RepoConfig);
 
-  async function fetchRepoConfig() {
-    console.debug("Getting repo config");
-    const repoCfg = await request<RepoConfig>('git-config');
-    console.debug("Got repo config", repoCfg);
-    updateRepoCfg(repoCfg);
+  const url = useSetting<string>('gitRepoUrl', repoCfg.originURL || upstreamURL);
+
+  const usingUpstream = url.value.trim() === upstreamURL.trim();
+  let urlIsValid: boolean;
+  try {
+    new URL(url.value.trim());
+    urlIsValid = true;
+  } catch (e) {
+    urlIsValid = false;
   }
 
   useEffect(() => {
@@ -41,48 +53,32 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function () {
   }, []);
 
   useEffect(() => {
-    if (repoCfg.originURL !== undefined) {
-      const _complete = (
-        username.trim() !== '' &&
-        password.trim() !== '' &&
-        (repoCfg.originURL || '').trim() !== '');
+    const _complete = (
+      username.trim() !== '' &&
+      name.trim() !== '' &&
+      email.trim() !== '' &&
+      urlIsValid);
 
-      updateRepoConfigComplete(_complete);
-      if (repoConfigOpenState === false && _complete === false) {
-        updateRepoConfigOpenState(true);
-      }
+    updateRepoConfigComplete(_complete);
+    if (repoConfigOpenState === false && _complete === false) {
+      updateRepoConfigOpenState(true);
     }
-  }, [username, password, repoCfg.originURL]);
+  }, [username, name, email, repoCfg.originURL]);
 
-  const [errors, setErrors] = useState([] as string[]);
-  const [finished, setFinished] = useState(false);
-  const [started, setStarted] = useState(false);
+  if (name.trim() === '' && repoCfg.name) { setName(repoCfg.name); }
+  if (email.trim() === '' && repoCfg.email) { setEmail(repoCfg.email); }
+  if (username.trim() === '' && repoCfg.username) { setUsername(repoCfg.username); }
 
-  if (authorName.trim() === '' && repoCfg.author.name !== undefined) { setAuthorName(repoCfg.author.name); }
-  if (authorEmail.trim() === '' && repoCfg.author.email !== undefined) { setAuthorEmail(repoCfg.author.email); }
+  const complete = (
+    urlIsValid &&
+    name.trim() != '' &&
+    email.trim() != '' &&
+    username.trim() != '');
 
-  async function handleSyncAction() {
-    setFinished(false);
-    setStarted(true);
-    setErrors([]);
-
-    updateRepoConfigOpenState(false);
-
-    const result = await request<{ errors: string[] }>(API_ENDPOINT, {
-      commitMsg,
-      authorName,
-      authorEmail,
-      gitUsername: username,
-      gitPassword: password,
-    });
-
-    setErrors(result.errors);
-    if (result.errors.length < 1) {
-      setCommitMsg('');
-    }
-
-    setStarted(false);
-    setFinished(true);
+  async function handleSaveAndClose() {
+    await url.commit();
+    await request<{ errors: string[] }>('git-config-set', { name, email, username });
+    closeWindow();
   }
 
   async function handleResetURL() {
@@ -91,144 +87,118 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function () {
     remote.app.exit(0);
   }
 
-  const complete = (
-    authorName.trim() != '' &&
-    authorEmail.trim() != '' &&
-    username.trim() != '' &&
-    password.trim() != '' &&
-    commitMsg.trim() != '');
+  async function copyUpstreamRepoURL() {
+    clipboard.writeText(upstreamURL);
+  }
+
+  async function fetchRepoConfig() {
+    const repoCfg = await request<RepoConfig>('git-config');
+    updateRepoCfg(repoCfg);
+  }
+
+  function closeWindow() {
+    remote.getCurrentWindow().hide();
+  }
 
   return (
-    <>
-      <div className={styles.dataSyncBase}>
-        <Button disabled={!repoConfigComplete} onClick={() => updateRepoConfigOpenState(!repoConfigOpenState)}>
-          {repoConfigComplete && repoConfigOpenState ? 'Hide r' : 'R'}
-          epository configuration
-          {!repoConfigOpenState && repoConfigComplete ? '…': null}
-        </Button>
+    <div className={styles.dataSyncBase}>
+      <Button disabled={!repoConfigComplete} onClick={() => updateRepoConfigOpenState(!repoConfigOpenState)}>
+        {repoConfigComplete && repoConfigOpenState ? 'Hide r' : 'R'}
+        epository configuration
+        {!repoConfigOpenState && repoConfigComplete ? '…': null}
+      </Button>
 
-        <Collapse className={styles.repoConfigCollapsible} isOpen={repoConfigOpenState}>
-          <Card key="repoUrl" className={styles.repoUrlCard}>
-            <FormGroup
-                label="Repository URL"
-                helperText={<Callout intent="warning">Note: resetting the URL will cause you to lose any unsubmitted changes.</Callout>}>
-              <InputGroup
-                defaultValue={repoCfg.originURL || ''}
-                disabled={true}
-                type="text"
-                rightElement={
-                  <Button
-                      intent="warning"
-                      minimal={true}
-                      title="Reset repository URL. Note: you will lose any unsubmitted changes."
-                      onClick={handleResetURL}>
-                    Reset URL
-                  </Button>
-                }
-              />
-            </FormGroup>
-          </Card>
-
-          <Card key="repoAuth" className={styles.repoAuthCard}>
-            <div className={styles.dataSyncRow}>
-              <Label key="username">
-                Git username
-                <InputGroup
-                  value={username}
-                  type="text"
-                  onChange={(evt: React.FormEvent<HTMLElement>) => {
-                    setUsername((evt.target as HTMLInputElement).value as string);
-                  }}
-                />
-              </Label>
-              <Label key="password">
-                Password
-                <InputGroup
-                  value={password}
-                  type="password"
-                  onChange={(evt: React.FormEvent<HTMLElement>) => {
-                    setPassword((evt.target as HTMLInputElement).value as string);
-                  }}
-                />
-              </Label>
-            </div>
-          </Card>
-        </Collapse>
-
-        {finished === true
-          ? <Collapse isOpen={!repoConfigOpenState}>
-              <Card key="resultMessage" className={styles.resultCard}>
-                <Callout
-                  intent={errors.length > 0 ? "warning" : "success"}
-                  title={errors.length > 0 ? "Errors encountered during merge sequence" : "Merge completed"}>
-
-                {errors.length > 0
-                  ? <UL>
-                      {errors.map((err: string) =>
-                        <li>{err}</li>
-                      )}
-                    </UL>
-                  : <p>Your changes have been merged and submitted.</p>}
+      <Card key="repoUrl" className={styles.repoUrlCard}>
+        <FormGroup
+            label="Repository URL"
+            intent={inPreLaunchSetup && !urlIsValid ? "danger" : undefined}
+            helperText={inPreLaunchSetup
+              ? <Callout intent="primary">
+                  <p>
+                    Please enter a valid URL of the repository you have commit access to,
+                    and which is a fork of the upstream repository.
+                  </p>
+                  <p>
+                    <Button onClick={copyUpstreamRepoURL}>Copy upstream repository URL</Button>
+                  </p>
                 </Callout>
-              </Card>
-            </Collapse>
-          : ''}
+              : <Callout intent="warning">
+                
+                  Note: resetting the URL will cause you to lose any unsubmitted changes.
+                </Callout>}>
+          <InputGroup
+            value={url.value}
+            placeholder={upstreamURL}
+            disabled={inPreLaunchSetup !== true}
+            type="text"
+            onChange={inPreLaunchSetup
+              ? (evt: React.FormEvent<HTMLElement>) => {
+                url.set((evt.target as HTMLInputElement).value as string);
+              }
+              : undefined}
+            rightElement={inPreLaunchSetup
+              ? undefined
+              : <Button
+                    intent="danger"
+                    minimal={true}
+                    title="Reset repository URL. Note: you will lose any unsubmitted changes."
+                    onClick={handleResetURL}>
+                  Reset URL
+                </Button>}
+          />
+        </FormGroup>
+      </Card>
 
-        <Card key="committerInfo" className={styles.committerInfoCard}>
-          <H4>Committing changes as</H4>
+      <Card key="committerInfo" className={styles.committerInfoCard}>
+        <H4>Committing changes as</H4>
 
-          <div className={styles.dataSyncRow}>
-            <Label key="authorName">
-              Author name
-              <InputGroup
-                value={authorName}
-                type="text"
-                onChange={(evt: React.FormEvent<HTMLElement>) => {
-                  setAuthorName((evt.target as HTMLInputElement).value as string);
-                }}
-              />
-            </Label>
-            <Label key="authorEmail">
-              Author email
-              <InputGroup
-                value={authorEmail}
-                type="email"
-                onChange={(evt: React.FormEvent<HTMLElement>) => {
-                  setAuthorEmail((evt.target as HTMLInputElement).value as string);
-                }}
-              />
-            </Label>
-          </div>
-        </Card>
-
-        <Card key="commitRow" className={styles.commitCard}>
-          <H4>Change notice</H4>
-
-          <FormGroup
-              className={styles.formGroup}
-              key="commitMsg"
-              intent="primary">
-            <TextArea
-              value={commitMsg}
-              fill={true}
-              large={true}
+        <div className={styles.dataSyncRow}>
+          <Label key="authorName">
+            Author name
+            <InputGroup
+              value={name}
+              type="text"
               onChange={(evt: React.FormEvent<HTMLElement>) => {
-                setCommitMsg((evt.target as HTMLInputElement).value as string);
+                setName((evt.target as HTMLInputElement).value as string);
               }}
             />
-          </FormGroup>
+          </Label>
 
-          <Button
-            className={styles.syncButton}
-            icon="git-merge"
-            intent="primary"
-            large={true}
-            disabled={complete === false}
-            loading={started === true}
-            title="Fetch other site editors’ changes, and submit yours"
-            onClick={handleSyncAction}>Merge Changes</Button>
-        </Card>
-      </div>
-    </>
+          <Label key="authorEmail">
+            Author email
+            <InputGroup
+              value={email}
+              type="email"
+              onChange={(evt: React.FormEvent<HTMLElement>) => {
+                setEmail((evt.target as HTMLInputElement).value as string);
+              }}
+            />
+          </Label>
+
+          <Label key="username">
+            Username
+            <InputGroup
+              value={username}
+              type="text"
+              onChange={(evt: React.FormEvent<HTMLElement>) => {
+                setUsername((evt.target as HTMLInputElement).value as string);
+              }}
+            />
+          </Label>
+        </div>
+      </Card>
+
+      <Card key="actionRow" className={styles.actionRowCard}>
+        <Button
+            className="confirm-button"
+            key="confirm"
+            intent={!usingUpstream ? "primary" : "warning"}
+            disabled={complete !== true}
+            onClick={handleSaveAndClose}>
+          Save {!usingUpstream ? "upstream" : "fork"} configuration
+          {inPreLaunchSetup ? " and launch" : " and close"}
+        </Button>
+      </Card>
+    </div>
   );
 };

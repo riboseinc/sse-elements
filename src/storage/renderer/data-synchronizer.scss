@@ -42,13 +42,13 @@
   @include card;
 }
 
-:local .committerInfoCard, :local .commitCard {
+:local .committerInfoCard {
   > :first-child {
     color: $pt-text-color-muted;
   }
 }
 
-:local .commitCard {
+:local .actionRowCard {
   @include card;
   overflow: unset;
 
