@@ -35,7 +35,6 @@ export function listen<I, O>(name: string, handler: Handler<I, O>) {
     } catch (e) {
       log.error(`SSE: API: Error handling request to ${name}! ${e.name}: ${e.message}`);
       response = { errors: [`${e.message}`], result: undefined };
-      return;
     }
 
     log.debug(`SSE: API: handled request to ${name}`);
