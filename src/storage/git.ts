@@ -1,8 +1,12 @@
 export interface GitAuthentication {
-  oauth2format?: 'github' | 'gitlab' | 'bitbucket',
-  token?: string,
+  /* Authentication as expected by isomorphic-git */
+
   username?: string,
   password?: string,
+
+  // Unsupported currently
+  oauth2format?: 'github' | 'gitlab' | 'bitbucket',
+  token?: string,
 }
 
 
