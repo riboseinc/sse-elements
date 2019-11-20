@@ -1,6 +1,6 @@
 {
   "name": "sse-elements",
-  "version": "0.1.0-beta21",
+  "version": "0.1.0-beta22",
   "main": "index.js",
   "types": "index.d.ts",
 
