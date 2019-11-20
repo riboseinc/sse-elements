@@ -128,11 +128,14 @@ export abstract class Storage<W extends Workspace> {
   public yaml: YAMLStorage;
   public workspace: W;
 
-  constructor(public fs: typeof import('fs-extra'), public workDir: string,
-      public storeManagers: { [key: string]: StoreManager<any> }) {
+  constructor(
+      public fs: typeof import('fs-extra'),
+      public workDir: string,
+      public storeManagers: { [key: string]: StoreManager<any> },
+      debugBackend?: true) {
     this.fs = fs;
     this.workDir = workDir;
-    this.yaml = new YAMLStorage(fs);
+    this.yaml = new YAMLStorage(fs, { debugLog: debugBackend || false });
 
     this.workspace = Object.keys(storeManagers).reduce((obj: any, key: string) => {
       obj[key] = {};
