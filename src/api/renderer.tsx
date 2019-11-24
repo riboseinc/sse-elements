@@ -14,7 +14,7 @@ import { APIResponse, reviveJsonValue, getEventNamesForEndpoint, getEventNamesFo
 
 
 class RequestFailure extends Error {
-  constructor(errorMessageList: string[]) {
+  constructor(public errorMessageList: string[]) {
     super(errorMessageList.join('; '));
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -31,7 +31,7 @@ export async function request<T>(endpointName: string, ...args: any[]): Promise<
       ipcRenderer.removeListener(eventNames.response, handleResp);
       const data: any = JSON.parse(rawData, reviveJsonValue);
 
-      if (data.errors) {
+      if (data.errors !== undefined) {
         // Means main is using listen(), new API
         const resp: APIResponse<T> = data;
 

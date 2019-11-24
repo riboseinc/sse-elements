@@ -33,7 +33,7 @@ export function listen<I, O>(name: string, handler: Handler<I, O>) {
     try {
       response = { errors: [], result: await handler(input) };
     } catch (e) {
-      log.error(`SSE: API: Error handling request to ${name}! ${e.name}: ${e.message}`);
+      log.error(`SSE: API: Error handling request to ${name}! ${e.toString()}: ${e.stack}}`);
       response = { errors: [`${e.message}`], result: undefined };
     }
 
