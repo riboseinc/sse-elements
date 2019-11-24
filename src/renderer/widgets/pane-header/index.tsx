@@ -9,6 +9,7 @@ interface PaneHeaderProps {
   align?: 'left' | 'right',
   className?: string,
   actions?: JSX.Element,
+  multiline?: boolean,
 }
 export const PaneHeader: React.FC<PaneHeaderProps> = function (props) {
   let alignmentClass: string;
@@ -29,7 +30,7 @@ export const PaneHeader: React.FC<PaneHeaderProps> = function (props) {
       ${props.minor ? styles.paneHeaderMinor : ''}
     `}>
 
-      <Text className={styles.title} ellipsize={true}>
+      <Text className={styles.title} ellipsize={!props.multiline}>
         {props.children}
       </Text>
 
