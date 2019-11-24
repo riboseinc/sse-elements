@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as fs from 'fs-extra';
+import AsyncLock from 'async-lock';
 import * as git from 'isomorphic-git';
 import * as log from 'electron-log';
 
@@ -17,16 +18,21 @@ const MAIN_REMOTE = 'origin';
 
 
 export class GitController {
+
   private auth: GitAuthentication = {};
+
+  private stagingLock: AsyncLock;
 
   constructor(
       private fs: any,
       private repoUrl: string,
       private upstreamRepoUrl: string,
-      private workDir: string,
+      public workDir: string,
       private corsProxy: string) {
 
     git.plugins.set('fs', fs);
+
+    this.stagingLock = new AsyncLock();
   }
 
   async isInitialized(): Promise<boolean> {
@@ -91,57 +97,125 @@ export class GitController {
   }
 
   async pull() {
-    log.verbose("SSE: GitController: Pulling with auto fast-forward merge");
-    await git.pull({
+    log.verbose("SSE: GitController: Pulling mater with fast-forward merge");
+
+    return await git.pull({
       dir: this.workDir,
-      ref: 'master',
       singleBranch: true,
       fastForwardOnly: true,
       ...this.auth,
     });
   }
 
-  async listChangedFiles(): Promise<string[]> {
+  public async listChangedFiles(pathSpecs = ['.']): Promise<string[]> {
+    /* Lists relative paths to all files that were changed and have not been committed. */
+
     const FILE = 0, HEAD = 1, WORKDIR = 2;
 
-    return (await git.statusMatrix({ dir: this.workDir }))
+    return (await git.statusMatrix({ dir: this.workDir, filepaths: pathSpecs }))
       .filter(row => row[HEAD] !== row[WORKDIR])
       .map(row => row[FILE]);
   }
 
-  async stageAllLocalChanges() {
-    log.verbose("SSE: GitController: Adding all changes");
+  async stage(pathSpecs: string[]) {
+    log.verbose(`SSE: GitController: Adding changes: ${pathSpecs}`);
 
-    await git.add({
-      dir: this.workDir,
-      filepath: '.',
-    });
-  }
-
-  async commitAllLocalChanges(withMsg: string): Promise<number> {
-    const filesChanged = (await this.listChangedFiles()).length;
-    if (filesChanged < 1) {
-      return 0;
+    for (const pathSpec of pathSpecs) {
+      await git.add({
+        dir: this.workDir,
+        filepath: pathSpec,
+      });
     }
-
-    await this.stageAllLocalChanges();
-    await this.commit(withMsg);
-
-    return filesChanged;
   }
 
   async commit(msg: string) {
-    log.verbose("SSE: GitController: Committing");
-    await git.commit({
+    log.verbose(`SSE: GitController: Committing with message ${msg}`);
+
+    return await git.commit({
       dir: this.workDir,
       message: msg,
-      author: {},
+      author: {},  // git-config values will be used
     });
+  }
+
+  public async stageAndCommit(pathSpecs: string[], msg: string, failIfDiverged = false): Promise<number> {
+    /* Stages and commits files matching given path spec with given message.
+
+       Returns the number of matching files with unstaged changes prior to staging.
+       If no matching files were found having unstaged changes,
+       skips the rest and returns zero.
+
+       If failIfDiverged is given, attempts a fast-forward pull after the commit.
+       It will fail immediately if main remote had other commits appear in meantime.
+
+       Locks so that this method cannot be run concurrently (by same instance).
+    */
+
+    return this.stagingLock.acquire('1', async () => {
+      const filesChanged = (await this.listChangedFiles(pathSpecs)).length;
+      if (filesChanged < 1) {
+        return 0;
+      }
+
+      await this.stage(pathSpecs);
+      await this.commit(msg);
+
+      if (failIfDiverged) {
+        await this.pull();
+      }
+
+      return filesChanged;
+    });
+  }
+
+  async listLocalCommits(): Promise<string[]> {
+    /* Returns a list of commit messages for commits that were not pushed yet.
+
+       Useful to check which commits will be thrown out
+       if we force update to remote master.
+
+       Does so by walking through last 100 commits starting from current HEAD.
+       When it encounters a commit that is an ancestor of remote master,
+       considers all preceding commits to be ahead.
+
+       If it finishes the walk without finding an ancestor, throws an error.
+       It is assumed that the app does not allow to accumulate
+       more than 100 commits without pushing (even 100 is too many!),
+       so there’s probably something strange going on.
+
+       Other assumptions:
+
+       * git.log returns commits from newest to oldest.
+       * The remote was already fetched.
+
+    */
+
+    const latestRemoteCommit = await git.resolveRef({
+      dir: this.workDir,
+      ref: `${MAIN_REMOTE}/master`,
+    });
+
+    const localCommits = await git.log({
+      dir: this.workDir,
+      depth: 100,
+    });
+
+    var commits = [] as string[];
+    for (const commit of localCommits) {
+      if (await git.isDescendent({ dir: this.workDir, oid: commit.oid, ancestor: latestRemoteCommit })) {
+        return commits;
+      } else {
+        commits.push(commit.message);
+      }
+    }
+
+    throw new Error("Did not find a local commit that is an ancestor of remote master");
   }
 
   async push(force = false) {
     log.verbose("SSE: GitController: Pushing");
-    await git.push({
+
+    return await git.push({
       dir: this.workDir,
       remote: MAIN_REMOTE,
       force: force,
@@ -217,19 +291,6 @@ export class GitController {
     return { success: true };
   }
 
-  async syncToRemote() {
-    // Operating on fork mean we shouldn’t have the need to pull
-    // try {
-    //   await this.pull();
-    // } catch (e) {
-    //   log.warn("SSE: GitController: Failed to pull & merge changes!");
-    //   return { errors: [`Error while fetching and merging changes: ${e.toString()}`] };
-    // }
-
-    // TODO: Short-cut this if no unpushed changes are present
-    await this.push();
-  }
-
 
   /* API setup */
 
@@ -247,6 +308,14 @@ export class GitController {
       this.auth.username = username;
 
       return { errors: [] };
+    });
+
+    listen<{ password: string }, { success: true }>
+    ('git-set-password', async ({ password }) => {
+      // WARNING: Don’t log password
+      log.verbose("SSE: GitController: received git-set-password request");
+      this.auth.password = password;
+      return { success: true };
     });
 
     listen<{}, { originURL: string | null, name: string | null, email: string | null, username: string | null }>
@@ -268,11 +337,11 @@ export class GitController {
     });
 
     listen<{ commitMsg: string }, { errors: string[] }>
-    ('commit-changes', async ({ commitMsg }) => {
-      log.verbose("SSE: GitController: received commit-changes request");
+    ('commit-all-changes', async ({ commitMsg }) => {
+      log.verbose(`SSE: GitController: received commit-all-changes with message: ${commitMsg}`);
 
       try {
-        await this.commitAllLocalChanges(commitMsg);
+        await this.stageAndCommit(['.'], commitMsg);
       } catch (e) {
         return { errors: [`Error committing local changes: ${e.toString()}`] };
       }
@@ -284,7 +353,7 @@ export class GitController {
       log.verbose("SSE: GitController: received sync-to-remote request");
 
       try {
-        await this.syncToRemote();
+        await this.push();
       } catch (e) {
         return { errors: [`Error syncing to remote: ${e.toString()}`] };
       }
@@ -367,7 +436,7 @@ export async function setRepoUrl(
 
       function handleSetting(evt: any, name: string, value: string) {
         if (name === 'gitRepoUrl') {
-          log.warn("SSE: GitController: received gitRepoUrl setting");
+          log.info("SSE: GitController: received gitRepoUrl setting");
           ipcMain.removeListener('set-setting', handleSetting);
           resolve({ url: value, hasChanged: true });
         }
