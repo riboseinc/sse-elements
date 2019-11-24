@@ -42,6 +42,7 @@ export const openWindow: WindowOpener = async ({
 
   const _existingWindow = getWindowByTitle(title);
   if (_existingWindow !== undefined) {
+    _existingWindow.show();
     _existingWindow.focus();
     return _existingWindow;
   }
