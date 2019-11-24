@@ -19,7 +19,7 @@
   > * {
     flex: 1;
   }
-  > :first-child {
+  > :not(:last-child) {
     margin-right: 1rem;
   }
 }
@@ -43,37 +43,25 @@
 }
 
 :local .committerInfoCard {
+  flex: 1;
+
   > :first-child {
     color: $pt-text-color-muted;
   }
 }
 
-:local .actionRowCard {
+:local .windowAction {
   @include card;
   overflow: unset;
 
-  flex: 1;
   display: flex;
   flex-flow: column nowrap;
   justify-content: flex-start;
   align-items: flex-start;
 
-  .formGroup {
-    align-self: stretch;
-    flex: 1;
-    flex-shrink: 0;
-
-    :global .bp3-form-content {
-      flex: 1;
-      flex-shrink: 0;
-      textarea {
-        min-height: 100%;
-      }
-    }
-  }
-
-  .syncButton {
-    align-self: flex-end;
+  :global .bp3-button {
+    box-shadow: none !important;
+    border-radius: 0 !important;
   }
 }
 

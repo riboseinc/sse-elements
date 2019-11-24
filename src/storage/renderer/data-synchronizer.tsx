@@ -27,9 +27,6 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
 
-  const [repoConfigOpenState, updateRepoConfigOpenState] = useState(false);
-  const [repoConfigComplete, updateRepoConfigComplete] = useState(false);
-
   const [repoCfg, updateRepoCfg] = useState({
     originURL: undefined,
     name: undefined,
@@ -37,7 +34,7 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
     username: undefined,
   } as RepoConfig);
 
-  const url = useSetting<string>('gitRepoUrl', repoCfg.originURL || upstreamURL);
+  const url = useSetting<string>('gitRepoUrl', '');
 
   const usingUpstream = url.value.trim() === upstreamURL.trim();
   let urlIsValid: boolean;
@@ -53,21 +50,10 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
   }, []);
 
   useEffect(() => {
-    const _complete = (
-      username.trim() !== '' &&
-      name.trim() !== '' &&
-      email.trim() !== '' &&
-      urlIsValid);
-
-    updateRepoConfigComplete(_complete);
-    if (repoConfigOpenState === false && _complete === false) {
-      updateRepoConfigOpenState(true);
-    }
-  }, [username, name, email, repoCfg.originURL]);
-
-  if (name.trim() === '' && repoCfg.name) { setName(repoCfg.name); }
-  if (email.trim() === '' && repoCfg.email) { setEmail(repoCfg.email); }
-  if (username.trim() === '' && repoCfg.username) { setUsername(repoCfg.username); }
+    if (name.trim() === '' && repoCfg.name) { setName(repoCfg.name); }
+    if (email.trim() === '' && repoCfg.email) { setEmail(repoCfg.email); }
+    if (username.trim() === '' && repoCfg.username) { setUsername(repoCfg.username); }
+  }, [name, email, username, JSON.stringify(repoCfg)]);
 
   const complete = (
     urlIsValid &&
@@ -76,7 +62,10 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
     username.trim() != '');
 
   async function handleSaveAndClose() {
-    await url.commit();
+    if (inPreLaunchSetup) {
+      // Cannot modify URL unless in pre launch
+      await url.commit();
+    }
     await request<{ errors: string[] }>('git-config-set', { name, email, username });
     closeWindow();
   }
@@ -92,22 +81,16 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
   }
 
   async function fetchRepoConfig() {
-    const repoCfg = await request<RepoConfig>('git-config');
+    const repoCfg = await request<RepoConfig>('git-config-get');
     updateRepoCfg(repoCfg);
   }
 
   function closeWindow() {
-    remote.getCurrentWindow().hide();
+    remote.getCurrentWindow().close();
   }
 
   return (
     <div className={styles.dataSyncBase}>
-      <Button disabled={!repoConfigComplete} onClick={() => updateRepoConfigOpenState(!repoConfigOpenState)}>
-        {repoConfigComplete && repoConfigOpenState ? 'Hide r' : 'R'}
-        epository configuration
-        {!repoConfigOpenState && repoConfigComplete ? '…': null}
-      </Button>
-
       <Card key="repoUrl" className={styles.repoUrlCard}>
         <FormGroup
             label="Repository URL"
@@ -123,7 +106,6 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
                   </p>
                 </Callout>
               : <Callout intent="warning">
-                
                   Note: resetting the URL will cause you to lose any unsubmitted changes.
                 </Callout>}>
           <InputGroup
@@ -188,17 +170,19 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
         </div>
       </Card>
 
-      <Card key="actionRow" className={styles.actionRowCard}>
+      <footer key="actionRow" className={styles.windowAction}>
         <Button
             className="confirm-button"
             key="confirm"
+            large={true}
+            fill={true}
             intent={!usingUpstream ? "primary" : "warning"}
             disabled={complete !== true}
             onClick={handleSaveAndClose}>
           Save {!usingUpstream ? "upstream" : "fork"} configuration
           {inPreLaunchSetup ? " and launch" : " and close"}
         </Button>
-      </Card>
+      </footer>
     </div>
   );
 };
