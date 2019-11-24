@@ -7,13 +7,16 @@ export function useSetting<T>(name: string, initialValue: T) {
 
   useEffect(() => {
     ipcRenderer.once('get-setting', handleSettingResponse);
+    ipcRenderer.send('get-setting', name);
     return function cleanup() {
       ipcRenderer.removeListener('get-setting', handleSettingResponse);
     }
   }, []);
 
-  function handleSettingResponse(evt: any, value: any) {
-    setValue(value as T);
+  function handleSettingResponse(evt: any, receivedSettingName: string, value: any) {
+    if (name === receivedSettingName) {
+      setValue(value as T);
+    }
   }
 
   async function commit() {

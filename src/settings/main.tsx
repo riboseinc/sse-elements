@@ -109,20 +109,20 @@ export class SettingManager {
   public setUpAPIEndpoints() {
     log.verbose("SSE: Settings: Configure API endpoints");
 
-    ipcMain.on('set-setting', (evt: any, name: string, value: any) => {
-      return this.setValue(name, value);
+    ipcMain.on('set-setting', async (evt: any, name: string, value: any) => {
+      return await this.setValue(name, value);
     });
 
-    ipcMain.on('get-setting', (evt: any, name: string) => {
-      const value = this.getValue(name);
-      evt.reply(value);
+    ipcMain.on('get-setting', async (evt: any, name: string) => {
+      const value = await this.getValue(name);
+      evt.reply('get-setting', name, value);
     });
 
     ipcMain.on('clear-setting', async (evt: any, name: string) => {
       log.debug(`SSE: Settings: received clear-setting request for ${name}`);
 
       await this.deleteValue(name);
-      evt.reply('ok');
+      evt.reply('clear-setting', 'ok');
     });
   }
 }
