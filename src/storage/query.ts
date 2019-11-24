@@ -1,10 +1,33 @@
-export interface IndexableObject { id: string | number, [key: string]: any }
+export interface IndexableObject<IDType = any> {
+  /* An indexable object is an object that has at least an `id` property
+     alongside whatever else fields describe that object.
 
-export interface Index<T extends IndexableObject> { [id: string]: T }
+     May be more appropriately named ContentType. */
+
+  id: IDType,
+  [fieldMame: string]: any,
+}
+
+
+export interface Index<T extends IndexableObject<any>> {
+  /* An index is a simple object
+     where each key is a stringified value of some property of object T,
+     and the value is assigned the corresponding object instance
+     for direct access.
+
+     The property in question must obviously not have duplicate values
+     across all objects. */
+
+  [stringifiedFieldValue: string]: T,
+}
+
 
 interface ArraySorter { (a: [string, unknown], b: [string, unknown]): number }
 
+
 export class QuerySet<T extends IndexableObject> {
+  /* Simplifies some operations on indexes, like a mini-pseudo-ORM. */
+
   index: Index<T>;
   order: ArraySorter;
   items: [string, T][];
