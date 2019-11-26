@@ -109,7 +109,7 @@ export class GitController {
   }
 
   async pull() {
-    log.verbose("SSE: GitController: Pulling mater with fast-forward merge");
+    log.verbose("SSE: GitController: Pulling master with fast-forward merge");
 
     return await git.pull({
       dir: this.workDir,
