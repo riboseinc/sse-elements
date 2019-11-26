@@ -1,15 +1,16 @@
 @import "~@blueprintjs/core/lib/scss/variables";
 
 @mixin card {
-  border-radius: 0 !important;
+  padding: 1rem;
   overflow: hidden;
+  border-radius: 0 !important;
+  background-color: $pt-app-background-color !important;
 }
 
 :local .dataSyncBase {
   display: flex;
   flex-flow: column nowrap;
   height: 100%;
-  background: $pt-app-background-color;
 }
 
 :local .dataSyncRow {
