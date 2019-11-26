@@ -40,32 +40,37 @@ implements VersionedStore<O, IDType> {
     return await this.fs.read(this.getRef(objId)) as O;
   }
 
-  public async listIDsWithUncommittedChanges() {
-    const changedFiles = await this.git.listChangedFiles([this.fsBaseRelativeToGit]);
-    const changedFilesRelative = changedFiles.map(fp => path.relative(this.fsBaseRelativeToGit, fp));
+  public async commit(objIds: IDType[], message: string) {
+    const paths = (await this.readUncommittedFileInfo()).
+      filter(fileinfo => fileinfo.objId !== undefined).
+      filter(fileinfo => objIds.indexOf(fileinfo.objId as IDType) >= 0).
+      map(fileinfo => fileinfo.path);
 
-    const resolvedObjects = await Promise.all(changedFilesRelative.map(async (fp) => {
-      let ref: string | undefined;
-      try { ref = await this.fs.resolveObjectId(fp); }
-      catch (e) { ref = undefined; }
-      return { path: fp, ref: ref };
-    }));
-
-    const orphanFiles = resolvedObjects.filter(obj => obj.ref === undefined);
-    if (orphanFiles.length > 0) {
-      log.warn("SSE: GitFilesystem: Resetting orphaned files",
-        orphanFiles.map(obj => this.gitRelativePath(obj.path)));
-      await this.git.resetFiles(orphanFiles.map(obj => this.gitRelativePath(obj.path)));
+    if (paths.length > 0) {
+      await this.git.stageAndCommit(paths, message);
     }
+  }
 
-    return resolvedObjects.
-      filter(obj => obj.ref !== undefined).
-      reduce((acc, obj) => {
-        var paths = [ ...(acc[obj.ref as string] || []) ];
-        paths.push(obj.path);
-        acc[obj.ref as string] = paths;
-        return acc;
-      }, {} as { [key: string]: string[] });
+  public async discard(objIds: IDType[]) {
+    const paths = (await this.readUncommittedFileInfo()).
+      filter(fileinfo => fileinfo.objId !== undefined).
+      filter(fileinfo => objIds.indexOf(fileinfo.objId as IDType) >= 0).
+      map(fileinfo => fileinfo.path);
+
+    if (paths.length > 0) {
+      await this.git.resetFiles(paths);
+    }
+  }
+
+  public async listUncommitted() {
+    const files = await this.readUncommittedFileInfo();
+    const objIds: IDType[] = files.
+      map(fileinfo => fileinfo.objId).
+      filter(objId => objId !== undefined) as IDType[];
+
+    return objIds.filter(function (objId, idx, self) {
+      return idx === self.indexOf(objId);
+    });
   }
 
   public async getIndex() {
@@ -121,6 +126,8 @@ implements VersionedStore<O, IDType> {
   }
 
   private async gitCommit(fsPaths: string[], commitMessage: string | null, autoCommitOpts: AutoCommitMessageOptions<O, IDType>) {
+    await this.resetOrphanFileChanges();
+
     try {
       await this.git.stageAndCommit(
         fsPaths.map(p => this.gitRelativePath(p)),
@@ -135,6 +142,48 @@ implements VersionedStore<O, IDType> {
         throw e;
       }
     }
+  }
+
+  private async resetOrphanFileChanges(): Promise<void> {
+    /* Remove from filesystem any files under our FS backend path
+       that the backend cannot account for. */
+
+    const orphanFilePaths = (await this.readUncommittedFileInfo()).
+    filter(fileinfo => fileinfo.objId === undefined).
+    map(fileinfo => fileinfo.path);
+
+    if (orphanFilePaths.length > 0) {
+      log.warn("SSE: GitFilesystem: Resetting orphaned files",
+        orphanFilePaths.map(fp => this.gitRelativePath(fp)));
+      await this.git.resetFiles(orphanFilePaths.map(fp => this.gitRelativePath(fp)));
+    }
+  }
+
+  private async readUncommittedFileInfo(): Promise<{ path: string, objId: IDType | undefined }[]> {
+    /* Returns a list of objects that map Git-relative paths to actual object IDs.
+       Where object ID is undefined, that implies file is “orphaned”
+       (not recognized as belonging to any object managed by this store). */
+
+    const changedFiles = await this.git.listChangedFiles([this.fsBaseRelativeToGit]);
+    console.debug("Uncommitted files", changedFiles);
+    const idx = await this.getIndex();
+
+    return await Promise.all(changedFiles.map(async (fp) => {
+      let ref: string | undefined;
+      try { ref = await this.fs.resolveObjectId(this.fsRelativePath(fp)); }
+      catch (e) { ref = undefined; }
+
+      const obj = ref !== undefined ? idx[ref] : undefined;
+
+      let objId: IDType | undefined;
+      if (obj !== undefined) {
+        objId = obj[this.idField];
+      } else {
+        objId = undefined;
+      }
+
+      return { path: fp, objId };
+    }));
   }
 
   private formatObjectName(objId: IDType, obj?: O) {
@@ -152,6 +201,13 @@ implements VersionedStore<O, IDType> {
 
   private gitRelativePath(fsPath: string): string {
     return path.join(this.fsBaseRelativeToGit, fsPath);
+  }
+
+  private fsRelativePath(gitPath: string): string {
+    if (path.isAbsolute(gitPath)) {
+      throw new Error("fsRelativePath() must be given Git-relative path");
+    }
+    return path.relative(this.fsBaseRelativeToGit, gitPath);
   }
 }
 
