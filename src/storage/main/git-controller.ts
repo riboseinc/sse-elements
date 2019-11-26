@@ -412,15 +412,6 @@ export async function initRepo(
   if (isInitialized === true && remotesMatch === true && force === false) {
     log.verbose("SSE: GitController: Already initialized");
 
-    log.verbose("SSE: GitController: Current remote URL matches configured repo URL");
-    const changedFiles = await gitCtrl.listChangedFiles();
-    if (changedFiles.length < 1) {
-      log.verbose("SSE: GitController: There are no local changes, let’s pull");
-      await gitCtrl.pull();
-    } else {
-      log.verbose("SSE: GitController: There are some local changes, not pulling");
-    }
-
   } else {
     log.warn("SSE: GitController is not initialized, has mismatching remote URLs, or force is true");
     log.debug(`SSE: GitController: remotes match: ${remotesMatch}`);
