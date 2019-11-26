@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as log from 'electron-log';
 
 import { Index, IndexableObject } from '../../query';
 import { FilesystemBackend } from '../filesystem/base';
@@ -42,11 +43,29 @@ implements VersionedStore<O, IDType> {
   public async listIDsWithUncommittedChanges() {
     const changedFiles = await this.git.listChangedFiles([this.fsBaseRelativeToGit]);
     const changedFilesRelative = changedFiles.map(fp => path.relative(this.fsBaseRelativeToGit, fp));
-    const changedFsIds = changedFilesRelative.map(fp => this.fs.resolveObjectId(fp));
 
-    return Object.values(await this.getIndex()).
-      filter(obj => changedFsIds.indexOf(this.getRef(obj[this.idField])) >= 0).
-      map(obj => obj[this.idField]);
+    const resolvedObjects = await Promise.all(changedFilesRelative.map(async (fp) => {
+      let ref: string | undefined;
+      try { ref = await this.fs.resolveObjectId(fp); }
+      catch (e) { ref = undefined; }
+      return { path: fp, ref: ref };
+    }));
+
+    const orphanFiles = resolvedObjects.filter(obj => obj.ref === undefined);
+    if (orphanFiles.length > 0) {
+      log.warn("SSE: GitFilesystem: Resetting orphaned files",
+        orphanFiles.map(obj => this.gitRelativePath(obj.path)));
+      await this.git.resetFiles(orphanFiles.map(obj => this.gitRelativePath(obj.path)));
+    }
+
+    return resolvedObjects.
+      filter(obj => obj.ref !== undefined).
+      reduce((acc, obj) => {
+        var paths = [ ...(acc[obj.ref as string] || []) ];
+        paths.push(obj.path);
+        acc[obj.ref as string] = paths;
+        return acc;
+      }, {} as { [key: string]: string[] });
   }
 
   public async getIndex() {
