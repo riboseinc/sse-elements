@@ -171,3 +171,11 @@ export async function notifyAllWindows(eventName: string, payload?: any) {
     return;
   }));
 }
+
+
+export async function notifyWindow(windowTitle: string, eventName: string, payload?: any) {
+  const window = getWindowByTitle(windowTitle);
+  if (window) {
+    await window.webContents.send(eventName, payload);
+  }
+}
