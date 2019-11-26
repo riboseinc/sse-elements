@@ -11,9 +11,14 @@ export interface Store<O extends IndexableObject<IDType>, IDType> {
 }
 
 
+export interface ModifiedObjectPaths {
+  [objId: string]: string[],
+}
+
+
 export interface VersionedStore<O extends IndexableObject<IDType>, IDType> extends Store<O, IDType> {
-  listIDsWithUncommittedChanges(): Promise<IDType[]>;
-  /* List IDs of uncommitted objects. */
+  listIDsWithUncommittedChanges(): Promise<ModifiedObjectPaths>;
+  /* List IDs of uncommitted objects, pointing to paths of changed files. */
 
   /* Object manipulation methods for versioned store
      support optional `commit` flag, containing either a commit message
