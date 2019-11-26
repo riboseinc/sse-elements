@@ -289,7 +289,11 @@ export class GitController {
   }
 
   private async _handleGitError(e: Error & { code: string }): Promise<void> {
-    if (e.code === 'FastForwardFail' || e.code === 'PushRejectedNonFastForward') {
+    if (e.code === 'FastForwardFail') {
+      // NOTE: There’s also PushRejectedNonFastForward, but it seems to be thrown
+      // for unrelated cases during push (false positive).
+      // Because of that false positive, we ignore that error and instead do pull first,
+      // catching actual fast-forward fails on that step before push.
       await sendRemoteStatus({ statusRelativeToLocal: 'diverged' });
     } else if (['MissingUsernameError', 'MissingAuthorError', 'MissingCommitterError'].indexOf(e.code) >= 0) {
       await sendRemoteStatus({ isMisconfigured: true });
@@ -310,8 +314,8 @@ export class GitController {
       const isOffline = (await checkOnlineStatus()) === false;
       await sendRemoteStatus({ isOffline });
 
-      const hasLocalChanges = (await this.listChangedFiles()).length > 0;
-      await sendRemoteStatus({ hasLocalChanges });
+      const hasUncommittedChanges = (await this.listChangedFiles()).length > 0;
+      await sendRemoteStatus({ hasLocalChanges: hasUncommittedChanges });
 
       if (!isOffline) {
         const needsPassword = this.needsPassword();
@@ -321,35 +325,35 @@ export class GitController {
           return;
         }
 
-        await sendRemoteStatus({ isPushing: true });
-        try {
-          await this.push();
-        } catch (e) {
-          log.error(e);
-          await sendRemoteStatus({ isPushing: false });
-          await this._handleGitError(e);
-          return;
-        }
-        await sendRemoteStatus({ isPushing: false });
-
-        await sendRemoteStatus({ isPulling: true });
-        try {
-          await this.pull();
-        } catch (e) {
-          log.error(e);
+        if (!hasUncommittedChanges) {
+          await sendRemoteStatus({ isPulling: true });
+          try {
+            await this.pull();
+          } catch (e) {
+            log.error(e);
+            await sendRemoteStatus({ isPulling: false });
+            await this._handleGitError(e);
+            return;
+          }
           await sendRemoteStatus({ isPulling: false });
-          await this._handleGitError(e);
-          return;
-        }
-        await sendRemoteStatus({ isPulling: false });
 
-        await sendRemoteStatus({
-          statusRelativeToLocal: 'updated',
-          isMisconfigured: false,
-          needsPassword: false,
-          isPulling: false,
-          isPushing: false,
-        });
+          await sendRemoteStatus({ isPushing: true });
+          try {
+            await this.push();
+          } catch (e) {
+            log.error(e);
+            await sendRemoteStatus({ isPushing: false });
+            await this._handleGitError(e);
+            return;
+          }
+          await sendRemoteStatus({ isPushing: false });
+
+          await sendRemoteStatus({
+            statusRelativeToLocal: 'updated',
+            isMisconfigured: false,
+            needsPassword: false,
+          });
+        }
       }
     });
   }
