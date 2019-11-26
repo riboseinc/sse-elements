@@ -138,7 +138,7 @@ export class GitController {
     });
   }
 
-  public async stageAndCommit(pathSpecs: string[], msg: string, failIfDiverged = false): Promise<number> {
+  public async stageAndCommit(pathSpecs: string[], msg: string): Promise<number> {
     /* Stages and commits files matching given path spec with given message.
 
        Returns the number of matching files with unstaged changes prior to staging.
@@ -159,10 +159,6 @@ export class GitController {
 
       await this.stage(pathSpecs);
       await this.commit(msg);
-
-      if (failIfDiverged) {
-        await this.pull();
-      }
 
       return filesChanged;
     });
