@@ -87,9 +87,9 @@ export abstract class AbstractLockingFilesystemBackend<T> implements FilesystemB
     return true;
   }
 
-  public resolveObjectId(filepath: string) {
+  public async resolveObjectId(filepath: string) {
     const objId = filepath.split(path.sep)[0];
-    if (!objId) {
+    if (!objId || !(await this.isValidId(objId))) {
       throw new Error(`Unable to resolve object ID for path ${filepath}`);
     }
     return objId;

@@ -18,6 +18,12 @@ class YAMLBackend<T = any> extends AbstractLockingFilesystemBackend<T> {
     return this.isYAMLFile(objId);
   }
 
+  public async resolveObjectId(objId: string) {
+    // Drop YAML extension from resolved path fragment.
+    const idWithExt = await super.resolveObjectId(objId);
+    return path.basename(idWithExt, YAML_EXT);
+  }
+
   public expandPath(objId: string) {
     // In this case, path to object includes YAML extension.
     return `${super.expandPath(objId)}${YAML_EXT}`;
