@@ -11,21 +11,23 @@ export interface Store<O extends IndexableObject<IDType>, IDType extends AnyIDTy
 }
 
 
-export interface ModifiedObjectPaths {
-  [objId: string]: string[],
-}
-
-
-export interface VersionedStore<O extends IndexableObject<IDType>, IDType> extends Store<O, IDType> {
-  listIDsWithUncommittedChanges(): Promise<ModifiedObjectPaths>;
-  /* List IDs of uncommitted objects, pointing to paths of changed files. */
-
+export interface VersionedStore<O extends IndexableObject<IDType>, IDType extends AnyIDType> extends Store<O, IDType> {
   /* Object manipulation methods for versioned store
      support optional `commit` flag, containing either a commit message
      or simply `true` for automatic commit message. */
   create(obj: O, commit: boolean | string): Promise<void>;
   update(objId: IDType, obj: O, commit: boolean | string): Promise<void>;
   delete(objId: IDType, commit: boolean | string): Promise<void>;
+
+  discard?(objIds: IDType[]): Promise<void>
+  /* Discard any uncommitted changes made to objects with specified IDs. */
+
+  commit?(objIds: IDType[], commitMessage: string): Promise<void>
+  /* Commit any uncommitted changes made to objects with specified IDs,
+     with specified commit message. */
+
+  listUncommitted?(): Promise<IDType[]>;
+  /* List IDs of objects with uncommitted changes. */
 }
 
 
