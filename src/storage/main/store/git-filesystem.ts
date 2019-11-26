@@ -3,7 +3,7 @@ import * as log from 'electron-log';
 
 import { Index, IndexableObject, AnyIDType } from '../../query';
 import { FilesystemBackend } from '../filesystem/base';
-import { GitController } from '../git-controller';
+import { GitController } from '../git/controller';
 import { VersionedStore, IDTakenError, CommitError } from './base';
 
 
