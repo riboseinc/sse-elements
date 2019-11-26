@@ -232,6 +232,16 @@ export class GitController {
     });
   }
 
+  async resetFiles(paths: string[]) {
+    log.verbose("SSE: GitController: Force resetting files");
+
+    return await git.fastCheckout({
+      dir: this.workDir,
+      force: true,
+      filepaths: paths,
+    });
+  }
+
 
   /* Fork/upstream workflow.
 
