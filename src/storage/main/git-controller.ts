@@ -126,7 +126,8 @@ export class GitController {
 
     return (await git.statusMatrix({ dir: this.workDir, filepaths: pathSpecs }))
       .filter(row => row[HEAD] !== row[WORKDIR])
-      .map(row => row[FILE]);
+      .map(row => row[FILE])
+      .filter(filepath => !filepath.startsWith('..'));
   }
 
   async stage(pathSpecs: string[]) {
