@@ -117,6 +117,7 @@ export class GitController {
       dir: this.workDir,
       singleBranch: true,
       fastForwardOnly: true,
+      fast: true,
       ...this.auth,
     });
   }
