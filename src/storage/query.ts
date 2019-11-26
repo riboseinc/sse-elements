@@ -5,7 +5,7 @@ export interface IndexableObject<IDType = any> {
      May be more appropriately named ContentType. */
 
   id: IDType,
-  [fieldMame: string]: any,
+  [fieldName: string]: any,
 }
 
 
