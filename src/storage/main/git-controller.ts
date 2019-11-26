@@ -51,6 +51,10 @@ export class GitController {
     return origin === remoteUrls.origin && upstream === remoteUrls.upstream;
   }
 
+  needsPassword(): boolean {
+    return (this.auth.password || '').trim() === '';
+  }
+
   async forceInitialize() {
     log.warn("SSE: GitController: Force initializing");
     log.warn("SSE: GitController: Initialize: Removing data directory");
@@ -94,6 +98,10 @@ export class GitController {
   async configGet(prop: string): Promise<string> {
     log.verbose("SSE: GitController: Get config", prop);
     return await git.config({ dir: this.workDir, path: prop });
+  }
+
+  public setPassword(value: string | undefined) {
+    this.auth.password = value;
   }
 
   async pull() {
