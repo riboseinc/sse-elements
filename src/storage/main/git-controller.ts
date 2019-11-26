@@ -67,7 +67,7 @@ export class GitController {
 
     await this.fs.ensureDir(this.workDir);
 
-    log.verbose("SSE: GitController: Initialize: Cloning");
+    log.verbose("SSE: GitController: Initialize: Cloning", this.repoUrl);
 
     await git.clone({
       dir: this.workDir,
@@ -133,7 +133,7 @@ export class GitController {
   }
 
   async stage(pathSpecs: string[]) {
-    log.verbose(`SSE: GitController: Adding changes: ${pathSpecs}`);
+    log.verbose(`SSE: GitController: Adding changes: ${pathSpecs.join(', ')}`);
 
     for (const pathSpec of pathSpecs) {
       await git.add({
@@ -169,6 +169,8 @@ export class GitController {
     */
 
     return this.stagingLock.acquire('1', async () => {
+      log.verbose(`SSE: GitController: Staging and committing: ${pathSpecs.join(', ')}`);
+
       const filesChanged = (await this.listChangedFiles(pathSpecs)).length;
       if (filesChanged < 1) {
         return 0;
