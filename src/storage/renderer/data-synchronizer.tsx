@@ -183,7 +183,7 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
             intent={!usingUpstream ? "primary" : "warning"}
             disabled={complete !== true}
             onClick={handleSaveAndClose}>
-          Save settings using {!usingUpstream ? "upstream" : "fork"} repository
+          Save settings using {usingUpstream ? "upstream" : "fork"} repository
           {inPreLaunchSetup ? " and launch" : " and close"}
         </Button>
       </footer>
