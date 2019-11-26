@@ -25,7 +25,7 @@ class YAMLBackend<T = any> extends AbstractLockingFilesystemBackend<T> {
   }
 
   public expandPath(objId: string) {
-    // In this case, path to object includes YAML extension.
+    // In this case, path to object should include YAML extension.
     return `${super.expandPath(objId)}${YAML_EXT}`;
   }
 
@@ -59,7 +59,6 @@ export class YAMLDirectoryBackend extends YAMLBackend<YAMLDirectoryStoreableCont
   constructor(baseDir: string, private metaProperties: string[]) { super(baseDir); }
 
   private expandDirectoryPath(objId: string) {
-    // Get rid of file extension, since in this case we’re dealing with directories
     return path.join(this.baseDir, objId);
   }
 
