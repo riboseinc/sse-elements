@@ -26,6 +26,7 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const [repoCfg, updateRepoCfg] = useState({
     originURL: undefined,
@@ -65,13 +66,22 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
     email.trim() != '' &&
     username.trim() != '');
 
+  async function updateGitConfigAndClose() {
+    await request<{ success: true }>('git-config-set', { name, email, username });
+    await closeWindow();
+  }
+
   async function handleSaveAndClose() {
+    setLoading(true);
+
+    // In pre launch we can modify URL, but updating Git config requires waiting for the app to load,
+    // initializing the repo
     if (inPreLaunchSetup) {
-      // Cannot modify URL unless in pre launch
       await url.commit();
+      ipcRenderer.on('app-loaded', updateGitConfigAndClose);
+    } else {
+      await updateGitConfigAndClose();
     }
-    await request<{ errors: string[] }>('git-config-set', { name, email, username });
-    closeWindow();
   }
 
   async function handleResetURL() {
@@ -89,8 +99,8 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
     updateRepoCfg(repoCfg);
   }
 
-  function closeWindow() {
-    remote.getCurrentWindow().close();
+  async function closeWindow() {
+    await remote.getCurrentWindow().close();
   }
 
   return (
@@ -181,6 +191,7 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
             large={true}
             fill={true}
             intent={!usingUpstream ? "primary" : "warning"}
+            loading={loading === true}
             disabled={complete !== true}
             onClick={handleSaveAndClose}>
           Save settings using {usingUpstream ? "upstream" : "fork"} repository
