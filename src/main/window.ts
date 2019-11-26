@@ -7,6 +7,16 @@ import { BrowserWindow, Menu, MenuItemConstructorOptions } from 'electron';
    TODO (#4): Move into the framework */
 
 
+export async function notifyAllWindows(eventName: string, payload?: any) {
+  return Promise.all(windows.map(async (window) => {
+    if (window) {
+      await window.webContents.send(eventName, payload);
+    }
+    return;
+  }));
+}
+
+
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const isMacOS = process.platform === 'darwin';
 

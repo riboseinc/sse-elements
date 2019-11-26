@@ -4,7 +4,7 @@
 import * as log from 'electron-log';
 
 import { ipcMain } from 'electron';
-import { openWindow, WindowOpenerParams } from '../main/window';
+import { notifyAllWindows, openWindow, WindowOpenerParams } from '../main/window';
 
 import { APIResponse, reviveJsonValue, getEventNamesForEndpoint, getEventNamesForWindowEndpoint } from './utils';
 
@@ -42,6 +42,12 @@ export function listen<I, O>(name: string, handler: Handler<I, O>) {
     evt.reply(eventNames.response, JSON.stringify(response));
   });
 }
+
+
+ipcMain.on('notify-all-windows', async (evt: any, messageName: string, payload?: any) => {
+  /* Allow any window to notify all open windows. */
+  await notifyAllWindows(messageName, payload);
+});
 
 
 export function makeWindowEndpoint(name: string, getWindowOpts: (params: any) => WindowOpenerParams): void {

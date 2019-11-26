@@ -21,6 +21,12 @@ class RequestFailure extends Error {
 }
 
 
+export async function notifyAllWindows(evtName: string, payload?: any): Promise<void> {
+  /* Sends an event to all open windows. */
+  await ipcRenderer.send('notify-all-windows', evtName, payload)
+}
+
+
 export async function request<T>(endpointName: string, ...args: any[]): Promise<T> {
   // TODO: This does not handle a timeout, so if `main` endpoint is misconfigured and never responds
   // the handler will remain listening
