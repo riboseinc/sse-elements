@@ -68,7 +68,7 @@ export class GitController {
       url: this.repoUrl,
       ref: 'master',
       singleBranch: true,
-      depth: 10,
+      depth: 5,
       corsProxy: this.corsProxy,
       ...this.auth,
     });
