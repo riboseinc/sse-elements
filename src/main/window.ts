@@ -3,16 +3,6 @@ import { format as formatUrl } from 'url';
 import { BrowserWindow, Menu, MenuItemConstructorOptions } from 'electron';
 
 
-export async function notifyAllWindows(eventName: string, payload?: any) {
-  return Promise.all(windows.map(async (window) => {
-    if (window) {
-      await window.webContents.send(eventName, payload);
-    }
-    return;
-  }));
-}
-
-
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const isMacOS = process.platform === 'darwin';
 
@@ -170,4 +160,14 @@ function createWindow(title: string, url: string, winParams: any, ignoreCache: b
   });
 
   return promise;
+}
+
+
+export async function notifyAllWindows(eventName: string, payload?: any) {
+  return Promise.all(windows.map(async (window) => {
+    if (window) {
+      await window.webContents.send(eventName, payload);
+    }
+    return;
+  }));
 }
