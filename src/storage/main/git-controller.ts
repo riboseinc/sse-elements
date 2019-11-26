@@ -345,7 +345,9 @@ export class GitController {
     ('git-set-password', async ({ password }) => {
       // WARNING: Don’t log password
       log.verbose("SSE: GitController: received git-set-password request");
-      this.auth.password = password;
+
+      this.setPassword(password);
+
       return { success: true };
     });
 
