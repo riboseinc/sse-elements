@@ -3,10 +3,6 @@ import { format as formatUrl } from 'url';
 import { BrowserWindow, Menu, MenuItemConstructorOptions } from 'electron';
 
 
-/* Window-related helpers
-   TODO (#4): Move into the framework */
-
-
 export async function notifyAllWindows(eventName: string, payload?: any) {
   return Promise.all(windows.map(async (window) => {
     if (window) {
