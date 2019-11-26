@@ -170,7 +170,7 @@ export class GitController {
 
   public async unstageAll() {
     log.verbose("SSE: GitController: Unstaging all changes");
-    await git.remove({ dir: this.workDir, filepath: '*' });
+    await git.remove({ dir: this.workDir, filepath: '.' });
   }
 
   async listLocalCommits(): Promise<string[]> {
