@@ -3,7 +3,7 @@ import { Index } from '../query';
 import { MainStorage } from '.';
 import { Storage } from '..';
 import { listen } from '../../api/main';
-import { VersionedStore } from './store/base';
+import { VersionedStore, ModifiedObjectPaths } from './store/base';
 
 
 export function provideAll<CTypeName extends keyof S, S extends Storage>
@@ -18,7 +18,7 @@ export function provideAll<CTypeName extends keyof S, S extends Storage>
 // provideModified(mainStorage, ctypename) can only be called if mainStorage[ctypename] is a GitFilesystemStore.
 export function provideModified<CTypeName extends keyof S, M extends MainStorage<S>, S extends Storage>
 (storage: M[CTypeName] extends VersionedStore<S[CTypeName], any> ? M : never, contentTypeName: CTypeName) {
-  return listen<{}, any[]>
+  return listen<{}, ModifiedObjectPaths>
   (`storage-read-modified-in-${contentTypeName}`, async () => {
     const store = storage[contentTypeName] as unknown as VersionedStore<S[CTypeName], any>;
     return await store.listIDsWithUncommittedChanges();
