@@ -284,26 +284,27 @@ export class GitController {
     await git.fetch({ dir: this.workDir, remote: UPSTREAM_REMOTE });
   }
 
-  async upstreamIsAhead(): Promise<boolean> {
-    // Consider upstream ahead if our current HEAD is a descendant of latest upstream commit
-    const headRef = await git.resolveRef({ dir: this.workDir, ref: 'HEAD' });
-    const latestUpstreamRef = await git.resolveRef({ dir: this.workDir, ref: `${UPSTREAM_REMOTE}/master` });
-    return await git.isDescendent({ dir: this.workDir, oid: headRef, ancestor: latestUpstreamRef, depth: -1 });
-  }
+  // These are broken.
+  // async upstreamIsAhead(): Promise<boolean> {
+  //   // Consider upstream ahead if our current HEAD is a descendant of latest upstream commit
+  //   const headRef = await git.resolveRef({ dir: this.workDir, ref: 'HEAD' });
+  //   const latestUpstreamRef = await git.resolveRef({ dir: this.workDir, ref: `${UPSTREAM_REMOTE}/master` });
+  //   return await git.isDescendent({ dir: this.workDir, oid: headRef, ancestor: latestUpstreamRef, depth: -1 });
+  // }
 
-  async isAheadOfUpstream(): Promise<boolean> {
+  // async isAheadOfUpstream(): Promise<boolean> {
 
-    // If we have local changes, we’re definitely ahead
-    // const filesLocallyModified = await this.listChangedFiles();
-    // if (filesLocallyModified.length > 0) {
-    //   return true;
-    // }
+  //   // If we have local changes, we’re definitely ahead
+  //   // const filesLocallyModified = await this.listChangedFiles();
+  //   // if (filesLocallyModified.length > 0) {
+  //   //   return true;
+  //   // }
 
-    // Consider us ahead if latest upstream commit is a descendant of our current HEAD
-    const headRef = await git.resolveRef({ dir: this.workDir, ref: 'HEAD' });
-    const latestUpstreamRef = await git.resolveRef({ dir: this.workDir, ref: `${UPSTREAM_REMOTE}/master` });
-    return await git.isDescendent({ dir: this.workDir, oid: latestUpstreamRef, ancestor: headRef, depth: -1 });
-  }
+  //   // Consider us ahead if latest upstream commit is a descendant of our current HEAD
+  //   const headRef = await git.resolveRef({ dir: this.workDir, ref: 'HEAD' });
+  //   const latestUpstreamRef = await git.resolveRef({ dir: this.workDir, ref: `${UPSTREAM_REMOTE}/master` });
+  //   return await git.isDescendent({ dir: this.workDir, oid: latestUpstreamRef, ancestor: headRef, depth: -1 });
+  // }
 
   async resetToUpstream(): Promise<{ success: boolean }> {
     const gitDir = path.join(this.workDir, '.git');
