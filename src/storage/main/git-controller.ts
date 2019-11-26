@@ -217,6 +217,10 @@ export class GitController {
     throw new Error("Did not find a local commit that is an ancestor of remote master");
   }
 
+  async fetchRemote(): Promise<void> {
+    await git.fetch({ dir: this.workDir, remote: MAIN_REMOTE });
+  }
+
   async push(force = false) {
     log.verbose("SSE: GitController: Pushing");
 
