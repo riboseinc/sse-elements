@@ -56,6 +56,8 @@ export class GitController {
   }
 
   async forceInitialize() {
+    /* Initializes from scratch: wipes work directory, clones again, adds remotes. */
+
     log.warn("SSE: GitController: Force initializing");
     log.warn("SSE: GitController: Initialize: Removing data directory");
 
