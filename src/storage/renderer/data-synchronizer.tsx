@@ -36,11 +36,15 @@ export const DataSynchronizer: React.FC<DataSynchronizerProps> = function ({ ups
 
   const url = useSetting<string>('gitRepoUrl', '');
 
-  const usingUpstream = url.value.trim() === upstreamURL.trim();
+  const usingUpstream = url.value && url.value.trim() === upstreamURL.trim();
   let urlIsValid: boolean;
   try {
-    new URL(url.value.trim());
-    urlIsValid = true;
+    if (url.value) {
+      new URL(url.value.trim());
+      urlIsValid = true;
+    } else {
+      urlIsValid = false;
+    }
   } catch (e) {
     urlIsValid = false;
   }
