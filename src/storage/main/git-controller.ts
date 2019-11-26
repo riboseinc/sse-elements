@@ -180,8 +180,8 @@ export class GitController {
        if we force update to remote master.
 
        Does so by walking through last 100 commits starting from current HEAD.
-       When it encounters a commit that is an ancestor of remote master,
-       considers all preceding commits to be ahead.
+       When it encounters the first local commit that doesn’t descends from remote master HEAD,
+       it considers all preceding commits to be ahead/local and returns them.
 
        If it finishes the walk without finding an ancestor, throws an error.
        It is assumed that the app does not allow to accumulate
@@ -208,9 +208,9 @@ export class GitController {
     var commits = [] as string[];
     for (const commit of localCommits) {
       if (await git.isDescendent({ dir: this.workDir, oid: commit.oid, ancestor: latestRemoteCommit })) {
-        return commits;
-      } else {
         commits.push(commit.message);
+      } else {
+        return commits;
       }
     }
 
