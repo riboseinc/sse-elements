@@ -1,9 +1,8 @@
-//import { Store } from './store/base';
-import { Index } from '../query';
-import { MainStorage } from '.';
-import { Storage } from '..';
 import { listen } from '../../api/main';
-import { VersionedStore, ModifiedObjectPaths } from './store/base';
+import { Index, AnyIDType } from '../query';
+import { Storage } from '..';
+import { MainStorage } from '.';
+import { VersionedStore } from './store/base';
 
 
 export function provideAll<CTypeName extends keyof S, S extends Storage>
@@ -15,21 +14,31 @@ export function provideAll<CTypeName extends keyof S, S extends Storage>
 }
 
 
-// provideModified(mainStorage, ctypename) can only be called if mainStorage[ctypename] is a GitFilesystemStore.
-export function provideModified<CTypeName extends keyof S, M extends MainStorage<S>, S extends Storage>
-(storage: M[CTypeName] extends VersionedStore<S[CTypeName], any> ? M : never, contentTypeName: CTypeName) {
-  return listen<{}, ModifiedObjectPaths>
-  (`storage-read-modified-in-${contentTypeName}`, async () => {
-    const store = storage[contentTypeName] as unknown as VersionedStore<S[CTypeName], any>;
-    return await store.listIDsWithUncommittedChanges();
+export function provideOne<CTypeName extends keyof S, S extends Storage>
+(storage: MainStorage<S>, contentTypeName: CTypeName) {
+  return listen<{ objectId: AnyIDType }, Index<S[CTypeName]>>
+  (`storage-read-one-in-${contentTypeName}`, async ({ objectId }) => {
+    return await storage[contentTypeName].read(objectId);
   });
 }
 
 
-export function provideOne<CTypeName extends keyof S, S extends Storage>
-(storage: MainStorage<S>, contentTypeName: CTypeName) {
-  return listen<{ objectId: S[CTypeName]["id"] }, Index<S[CTypeName]>>
-  (`storage-read-one-in-${contentTypeName}`, async ({ objectId }) => {
-    return await storage[contentTypeName].read(objectId);
+// Below can only be called if mainStorage[ctypename]
+// is a VersionedStore that implements listUncommitted(), commit(), discard() methods.
+
+export function provideModified<CTypeName extends keyof S, M extends MainStorage<S>, S extends Storage>
+(storage: M[CTypeName] extends VersionedStore<S[CTypeName], any> ? M : never, contentTypeName: CTypeName) {
+  return listen<{}, AnyIDType[]>
+  (`storage-read-modified-in-${contentTypeName}`, async () => {
+    const store = storage[contentTypeName] as unknown as VersionedStore<S[CTypeName], any>;
+    if (store.listUncommitted) {
+      return await store.listUncommitted();
+    } else {
+      throw new Error("Store does not support listUncommitted()");
+    }
+  });
+}
+
+
   });
 }
