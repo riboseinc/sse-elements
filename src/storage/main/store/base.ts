@@ -1,7 +1,7 @@
-import { Index, IndexableObject } from '../../query';
+import { AnyIDType, Index, IndexableObject } from '../../query';
 
 
-export interface Store<O extends IndexableObject<IDType>, IDType> {
+export interface Store<O extends IndexableObject<IDType>, IDType extends AnyIDType> {
   getIndex(rebuild?: true): Promise<Index<O>>;
 
   read(objId: IDType): Promise<O>;
@@ -29,7 +29,7 @@ export interface VersionedStore<O extends IndexableObject<IDType>, IDType> exten
 }
 
 
-export class StoreError<O extends IndexableObject<IDType>, IDType> extends Error  {
+export class StoreError<O extends IndexableObject> extends Error {
   constructor(msg: string) {
     super(msg);
     Object.setPrototypeOf(this, new.target.prototype);
@@ -37,7 +37,7 @@ export class StoreError<O extends IndexableObject<IDType>, IDType> extends Error
 }
 
 
-export class IDTakenError<O extends IndexableObject<IDType>, IDType> extends StoreError<O, IDType> {
+export class IDTakenError<O extends IndexableObject<IDType>, IDType extends AnyIDType> extends StoreError<O> {
   constructor(public objectId: IDType) {
     super(`ID is taken, such an object already exists: ${objectId}`);
     Object.setPrototypeOf(this, new.target.prototype);

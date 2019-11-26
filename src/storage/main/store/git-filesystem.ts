@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as log from 'electron-log';
 
-import { Index, IndexableObject } from '../../query';
+import { Index, IndexableObject, AnyIDType } from '../../query';
 import { FilesystemBackend } from '../filesystem/base';
 import { GitController } from '../git-controller';
 import { VersionedStore, IDTakenError, CommitError } from './base';
@@ -10,7 +10,7 @@ import { VersionedStore, IDTakenError, CommitError } from './base';
 export class GitFilesystemStore<
   O extends IndexableObject<IDType>,
   FSBackend extends FilesystemBackend<any>,
-  IDType extends string | number>
+  IDType extends AnyIDType>
 implements VersionedStore<O, IDType> {
   /* Combines a filesystem storage with Git. */
 

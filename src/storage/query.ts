@@ -1,4 +1,8 @@
-export interface IndexableObject<IDType = any> {
+export type AnyIDType = string | number;
+/* Possible ID types. */
+
+
+export interface IndexableObject<IDType extends AnyIDType = AnyIDType> {
   /* An indexable object is an object that has at least an `id` property
      alongside whatever else fields describe that object.
 
@@ -9,7 +13,7 @@ export interface IndexableObject<IDType = any> {
 }
 
 
-export interface Index<T extends IndexableObject<any>> {
+export interface Index<T extends IndexableObject> {
   /* An index is a simple object
      where each key is a stringified value of some property of object T,
      and the value is assigned the corresponding object instance
