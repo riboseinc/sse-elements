@@ -61,8 +61,6 @@ implements VersionedStore<O, IDType> {
   public async create(obj: O, commit: boolean | string = false) {
     const objPath = this.getRef(obj[this.idField]);
 
-    console.debug(objPath);
-
     if (await this.fs.exists(objPath)) {
       throw new IDTakenError(obj[this.idField]);
     }
