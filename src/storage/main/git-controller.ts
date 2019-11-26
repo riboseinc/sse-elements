@@ -333,7 +333,7 @@ export class GitController {
   setUpAPIEndpoints() {
     log.verbose("SSE: GitController: Setting up API endpoints");
 
-    listen<{ name: string, email: string, username: string }, { errors: string[] }>
+    listen<{ name: string, email: string, username: string }, { success: true }>
     ('git-config-set', async ({ name, email, username }) => {
       log.verbose("SSE: GitController: received git-config-set request");
 
@@ -343,7 +343,7 @@ export class GitController {
 
       this.auth.username = username;
 
-      return { errors: [] };
+      return { success: true };
     });
 
     listen<{ password: string }, { success: true }>
