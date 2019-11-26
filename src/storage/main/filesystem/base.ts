@@ -30,16 +30,16 @@ export interface FilesystemBackend<T> {
   /* Updates given object and returns a list of filesystem paths that could be affected.
      If `newData` is undefined, the object is expected to be deleted. */
 
+
+  // TODO: Following two can be renamed for clarity.
+
   expandPath(objId: string): string;
   /* Returns an absolute path to object file or root directory,
      given object ID. Adds an extension where applicable.
      Used by read(), write() under the hood. TODO: Should be made private? */
 
   resolveObjectId(path: string): Promise<string>;
-  /* Given path, returns object’s FS backend ID */
-
-
-  // TODO: Following two can be renamed for clarity.
+  /* Given path, returns object’s FS backend ID. */
 
   exists(objId: string): Promise<boolean>;
   /* Given object ID, returns true if the object actually exists.
