@@ -35,7 +35,7 @@ export interface FilesystemBackend<T> {
      given object ID. Adds an extension where applicable.
      Used by read(), write() under the hood. TODO: Should be made private? */
 
-  resolveObjectId(path: string): string;
+  resolveObjectId(path: string): Promise<string>;
   /* Given path, returns object’s FS backend ID */
 
 
