@@ -1,4 +1,5 @@
 import { listen } from '../../api/main';
+import { notifyAllWindows } from '../../main/window';
 import { Index, AnyIDType } from '../query';
 import { Storage } from '..';
 import { MainStorage } from '.';
@@ -40,5 +41,32 @@ export function provideModified<CTypeName extends keyof S, M extends MainStorage
 }
 
 
+export function listenToBatchCommits<CTypeName extends keyof S, M extends MainStorage<S>, S extends Storage>
+(storage: M[CTypeName] extends VersionedStore<S[CTypeName], any> ? M : never, contentTypeName: CTypeName) {
+  return listen<{ objIds: AnyIDType[], commitMsg: string }, { success: true }>
+  (`storage-commit-objects-in-${contentTypeName}`, async ({ objIds, commitMsg }) => {
+    const store = storage[contentTypeName] as unknown as VersionedStore<S[CTypeName], any>;
+    if (store.commit) {
+      await store.commit(objIds, commitMsg);
+    } else {
+      throw new Error("Store does not support commit()");
+    }
+    return { success: true };
+  });
+}
+
+
+export function listenToBatchDiscardRequests<CTypeName extends keyof S, M extends MainStorage<S>, S extends Storage>
+(storage: M[CTypeName] extends VersionedStore<S[CTypeName], any> ? M : never, contentTypeName: CTypeName) {
+  return listen<{ objIds: AnyIDType[] }, { success: true }>
+  (`storage-discard-uncommitted-changes-for-objects-in-${contentTypeName}`, async ({ objIds }) => {
+    const store = storage[contentTypeName] as unknown as VersionedStore<S[CTypeName], any>;
+    if (store.discard) {
+      await store.discard(objIds);
+    } else {
+      throw new Error("Store does not support discard()");
+    }
+    await notifyAllWindows(`${contentTypeName}-changed`, { objIds });
+    return { success: true };
   });
 }
