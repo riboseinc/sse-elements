@@ -153,6 +153,8 @@ export class GitController {
   public async stageAndCommit(pathSpecs: string[], msg: string): Promise<number> {
     /* Stages and commits files matching given path spec with given message.
 
+       Any other files staged at the time of the call will be unstaged.
+
        Returns the number of matching files with unstaged changes prior to staging.
        If no matching files were found having unstaged changes,
        skips the rest and returns zero.
@@ -169,6 +171,7 @@ export class GitController {
         return 0;
       }
 
+      await this.unstageAll();
       await this.stage(pathSpecs);
       await this.commit(msg);
 
