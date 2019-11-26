@@ -82,9 +82,13 @@ export class GitController {
       remote: UPSTREAM_REMOTE,
       url: this.upstreamRepoUrl,
     });
+  }
 
-    // Configure auth with git-config username, if set
-    const username = await git.config({ dir: this.workDir, path: 'credentials.username' });
+  async loadAuth() {
+    /* Configure auth with git-config username, if set.
+       Supposed to be happening automatically? Maybe not.
+       This method must be manually called before making operations that need auth. */
+    const username = await this.configGet('credentials.username');
     if (username) {
       this.auth.username = username;
     }
@@ -417,6 +421,7 @@ export async function initRepo(
     await gitCtrl.forceInitialize();
 
   }
+  await gitCtrl.loadAuth();
   return gitCtrl;
 }
 
