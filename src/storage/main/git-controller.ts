@@ -370,16 +370,18 @@ export class GitController {
       return { filenames: await this.listChangedFiles() };
     });
 
-    listen<{ commitMsg: string }, { errors: string[] }>
-    ('commit-all-changes', async ({ commitMsg }) => {
-      log.verbose(`SSE: GitController: received commit-all-changes with message: ${commitMsg}`);
+    listen<{ paths: string[] }, { success: true }>
+    ('discard-local-changes', async ({ paths }) => {
+      log.verbose(`SSE: GitController: received discard-local-changes with files ${paths.join(', ')}`);
+      await this.resetFiles(paths);
+      return { success: true };
+    });
 
-      try {
-        await this.stageAndCommit(['.'], commitMsg);
-      } catch (e) {
-        return { errors: [`Error committing local changes: ${e.toString()}`] };
-      }
-      return { errors: [] };
+    listen<{ paths: string[], commitMsg: string }, { success: true }>
+    ('commit-files', async ({ paths, commitMsg }) => {
+      log.verbose(`SSE: GitController: received commit-files with files ${paths.join(', ')} and message ${commitMsg}`);
+      await this.stageAndCommit(paths, commitMsg);
+      return { success: true };
     });
 
     listen<{}, { errors: string[] }>
