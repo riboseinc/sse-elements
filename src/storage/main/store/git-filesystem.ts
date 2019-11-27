@@ -95,7 +95,7 @@ implements VersionedStore<O, IDType> {
       await this.gitCommit(
         paths,
         commit !== true ? commit : null,
-        { verb: 'delete', objId: obj[this.idField], obj });
+        { verb: 'create', objId: obj[this.idField], obj });
     }
   }
 
