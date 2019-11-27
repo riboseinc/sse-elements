@@ -322,24 +322,25 @@ export class GitController {
 
        Notifies all windows about the status in process. */
 
-    const isOffline = (await checkOnlineStatus()) === false;
-    await sendRemoteStatus({ isOffline });
-
     log.verbose("SSE: Git: Queueing sync");
     return await this.stagingLock.acquire('1', async () => {
       log.verbose("SSE: Git: Starting sync");
 
-      if (!isOffline) {
-        const needsPassword = this.needsPassword();
-        await sendRemoteStatus({ needsPassword });
+      const hasUncommittedChanges = await this.checkUncommitted();
 
-        if (needsPassword) {
-          return;
-        }
+      if (!hasUncommittedChanges) {
 
-        const hasUncommittedChanges = await this.checkUncommitted();
+        const isOffline = (await checkOnlineStatus()) === false;
+        await sendRemoteStatus({ isOffline });
 
-        if (!hasUncommittedChanges) {
+        if (!isOffline) {
+
+          const needsPassword = this.needsPassword();
+          await sendRemoteStatus({ needsPassword });
+          if (needsPassword) {
+            return;
+          }
+
           await sendRemoteStatus({ isPulling: true });
           try {
             await this.pull();
