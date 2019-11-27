@@ -39,6 +39,7 @@ export class GitController {
 
     // Makes it easier to bind these to IPC events
     this.synchronize = this.synchronize.bind(this);
+    this.resetFiles = this.resetFiles.bind(this);
     this.checkUncommitted = this.checkUncommitted.bind(this);
   }
 
@@ -169,14 +170,14 @@ export class GitController {
     });
   }
 
-  async resetFiles(paths: string[]) {
-    log.verbose("SSE: GitController: Force resetting files");
-
+  public async resetFiles(paths?: string[]) {
     return await this.stagingLock.acquire('1', async () => {
+      log.verbose("SSE: GitController: Force resetting files");
+
       return await git.fastCheckout({
         dir: this.workDir,
         force: true,
-        filepaths: paths,
+        filepaths: paths || (await this.listChangedFiles()),
       });
     });
   }
