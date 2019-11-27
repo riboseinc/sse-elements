@@ -37,7 +37,9 @@ export class GitController {
 
     this.stagingLock = new AsyncLock({ timeout: 20000, maxPending: 10 });
 
+    // Makes it easier to bind these to IPC events
     this.synchronize = this.synchronize.bind(this);
+    this.checkUncommitted = this.checkUncommitted.bind(this);
   }
 
   public async isInitialized(): Promise<boolean> {
@@ -303,19 +305,28 @@ export class GitController {
     }
   }
 
+  public async checkUncommitted(): Promise<boolean> {
+    /* Checks for any uncommitted changes locally present.
+       Notifies all windows about the status. */
+
+    log.debug("SSE: Git: Checking for uncommitted changes");
+    const hasUncommittedChanges = (await this.listChangedFiles()).length > 0;
+    await sendRemoteStatus({ hasLocalChanges: hasUncommittedChanges });
+    return hasUncommittedChanges;
+  }
+
   public async synchronize(): Promise<void> {
     /* Checks for connection, local changes and unpushed commits,
-       tries to push and pull when there’s opportunity. */
+       tries to push and pull when there’s opportunity.
+
+       Notifies all windows about the status in process. */
+
+    const isOffline = (await checkOnlineStatus()) === false;
+    await sendRemoteStatus({ isOffline });
 
     log.verbose("SSE: Git: Queueing sync");
     return await this.stagingLock.acquire('1', async () => {
       log.verbose("SSE: Git: Starting sync");
-
-      const isOffline = (await checkOnlineStatus()) === false;
-      await sendRemoteStatus({ isOffline });
-
-      const hasUncommittedChanges = (await this.listChangedFiles()).length > 0;
-      await sendRemoteStatus({ hasLocalChanges: hasUncommittedChanges });
 
       if (!isOffline) {
         const needsPassword = this.needsPassword();
@@ -324,6 +335,8 @@ export class GitController {
         if (needsPassword) {
           return;
         }
+
+        const hasUncommittedChanges = await this.checkUncommitted();
 
         if (!hasUncommittedChanges) {
           await sendRemoteStatus({ isPulling: true });
