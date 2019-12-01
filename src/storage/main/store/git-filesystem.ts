@@ -165,7 +165,6 @@ implements VersionedStore<O, IDType> {
        (not recognized as belonging to any object managed by this store). */
 
     const changedFiles = await this.git.listChangedFiles([this.fsBaseRelativeToGit]);
-    console.debug("Uncommitted files", changedFiles);
     const idx = await this.getIndex();
 
     return await Promise.all(changedFiles.map(async (fp) => {
