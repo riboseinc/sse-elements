@@ -292,7 +292,7 @@ export class GitController {
   }
 
   private async _handleGitError(e: Error & { code: string }): Promise<void> {
-    if (e.code === 'FastForwardFail') {
+    if (e.code === 'FastForwardFail' || e.code === 'MergeNotSupportedFail') {
       // NOTE: There’s also PushRejectedNonFastForward, but it seems to be thrown
       // for unrelated cases during push (false positive).
       // Because of that false positive, we ignore that error and instead do pull first,
