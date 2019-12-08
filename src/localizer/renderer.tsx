@@ -13,7 +13,7 @@ interface LangConfigContextSpec extends LangConfig {
 
 export const LangConfigContext = React.createContext<LangConfigContextSpec>({
   available: { en: 'English', zh: 'Chinese', ru: 'Russian' },
-  default: 'en',
+  default: 'en' as const,
   selected: 'en',
   select: (id: string) => {},
 });
