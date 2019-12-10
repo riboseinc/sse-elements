@@ -9,7 +9,8 @@ import { AbstractLockingFilesystemBackend } from '../base';
 const YAML_EXT = '.yaml';
 
 
-class YAMLBackend<T = any> extends AbstractLockingFilesystemBackend<T> {
+export class YAMLBackend<T = any> extends AbstractLockingFilesystemBackend<T> {
+
   protected isYAMLFile(objId: string) {
     return path.extname(objId) === YAML_EXT;
   }

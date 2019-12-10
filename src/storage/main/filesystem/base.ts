@@ -96,11 +96,11 @@ export abstract class AbstractLockingFilesystemBackend<T> implements FilesystemB
   }
 
   public async readAll() {
-    const objIds = await fs.readdir(this.baseDir);
+    const objPaths = await fs.readdir(this.baseDir);
     var objs = [];
-    for (const objId of objIds) {
-      if (await this.isValidId(objId)) {
-        objs.push(await this.read(objId));
+    for (const objPath of objPaths) {
+      if (await this.isValidId(objPath)) {
+        objs.push(await this.read(await this.resolveObjectId(objPath)));
       }
     }
     return objs;
