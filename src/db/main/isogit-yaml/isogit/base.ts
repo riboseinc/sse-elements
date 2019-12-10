@@ -20,7 +20,7 @@ const UPSTREAM_REMOTE = 'upstream';
 const MAIN_REMOTE = 'origin';
 
 
-export class GitController {
+export class IsoGitWrapper {
 
   private auth: GitAuthentication = {};
 
@@ -66,16 +66,16 @@ export class GitController {
   public async forceInitialize() {
     /* Initializes from scratch: wipes work directory, clones again, adds remotes. */
 
-    log.warn("SSE: GitController: Force initializing");
-    log.warn("SSE: GitController: Initialize: Removing data directory");
+    log.warn("SSE: IsoGitWrapper: Force initializing");
+    log.warn("SSE: IsoGitWrapper: Initialize: Removing data directory");
 
     await this.fs.remove(this.workDir);
 
-    log.silly("SSE: GitController: Initialize: Ensuring data directory exists");
+    log.silly("SSE: IsoGitWrapper: Initialize: Ensuring data directory exists");
 
     await this.fs.ensureDir(this.workDir);
 
-    log.verbose("SSE: GitController: Initialize: Cloning", this.repoUrl);
+    log.verbose("SSE: IsoGitWrapper: Initialize: Cloning", this.repoUrl);
 
     await git.clone({
       dir: this.workDir,
@@ -95,12 +95,12 @@ export class GitController {
   }
 
   public async configSet(prop: string, val: string) {
-    log.verbose("SSE: GitController: Set config");
+    log.verbose("SSE: IsoGitWrapper: Set config");
     await git.config({ dir: this.workDir, path: prop, value: val });
   }
 
   public async configGet(prop: string): Promise<string> {
-    log.verbose("SSE: GitController: Get config", prop);
+    log.verbose("SSE: IsoGitWrapper: Get config", prop);
     return await git.config({ dir: this.workDir, path: prop });
   }
 
@@ -119,7 +119,7 @@ export class GitController {
   }
 
   async pull() {
-    log.verbose("SSE: GitController: Pulling master with fast-forward merge");
+    log.verbose("SSE: IsoGitWrapper: Pulling master with fast-forward merge");
 
     return await git.pull({
       dir: this.workDir,
@@ -131,7 +131,7 @@ export class GitController {
   }
 
   async stage(pathSpecs: string[]) {
-    log.verbose(`SSE: GitController: Adding changes: ${pathSpecs.join(', ')}`);
+    log.verbose(`SSE: IsoGitWrapper: Adding changes: ${pathSpecs.join(', ')}`);
 
     for (const pathSpec of pathSpecs) {
       await git.add({
@@ -142,7 +142,7 @@ export class GitController {
   }
 
   async commit(msg: string) {
-    log.verbose(`SSE: GitController: Committing with message ${msg}`);
+    log.verbose(`SSE: IsoGitWrapper: Committing with message ${msg}`);
 
     return await git.commit({
       dir: this.workDir,
@@ -160,7 +160,7 @@ export class GitController {
   }
 
   async push(force = false) {
-    log.verbose("SSE: GitController: Pushing");
+    log.verbose("SSE: IsoGitWrapper: Pushing");
 
     return await git.push({
       dir: this.workDir,
@@ -172,7 +172,7 @@ export class GitController {
 
   public async resetFiles(paths?: string[]) {
     return await this.stagingLock.acquire('1', async () => {
-      log.verbose("SSE: GitController: Force resetting files");
+      log.verbose("SSE: IsoGitWrapper: Force resetting files");
 
       return await git.fastCheckout({
         dir: this.workDir,
@@ -271,7 +271,7 @@ export class GitController {
     }
 
     return await this.stagingLock.acquire('1', async () => {
-      log.verbose(`SSE: GitController: Staging and committing: ${pathSpecs.join(', ')}`);
+      log.verbose(`SSE: IsoGitWrapper: Staging and committing: ${pathSpecs.join(', ')}`);
 
       const filesChanged = (await this.listChangedFiles(pathSpecs)).length;
       if (filesChanged < 1) {
@@ -287,7 +287,7 @@ export class GitController {
   }
 
   private async unstageAll() {
-    log.verbose("SSE: GitController: Unstaging all changes");
+    log.verbose("SSE: IsoGitWrapper: Unstaging all changes");
     await git.remove({ dir: this.workDir, filepath: '.' });
   }
 
@@ -377,11 +377,11 @@ export class GitController {
   /* IPC endpoint setup */
 
   setUpAPIEndpoints() {
-    log.verbose("SSE: GitController: Setting up API endpoints");
+    log.verbose("SSE: IsoGitWrapper: Setting up API endpoints");
 
     listen<{ name: string, email: string, username: string }, { success: true }>
     ('git-config-set', async ({ name, email, username }) => {
-      log.verbose("SSE: GitController: received git-config-set request");
+      log.verbose("SSE: IsoGitWrapper: received git-config-set request");
 
       await this.configSet('user.name', name);
       await this.configSet('user.email', email);
@@ -397,7 +397,7 @@ export class GitController {
     listen<{ password: string }, { success: true }>
     ('git-set-password', async ({ password }) => {
       // WARNING: Don’t log password
-      log.verbose("SSE: GitController: received git-set-password request");
+      log.verbose("SSE: IsoGitWrapper: received git-set-password request");
 
       this.setPassword(password);
       this.synchronize();
@@ -407,7 +407,7 @@ export class GitController {
 
     listen<{}, { originURL: string | null, name: string | null, email: string | null, username: string | null }>
     ('git-config-get', async () => {
-      log.verbose("SSE: GitController: received git-config request");
+      log.verbose("SSE: IsoGitWrapper: received git-config request");
       return {
         originURL: await this.getOriginUrl(),
         name: await this.configGet('user.name'),
@@ -426,7 +426,7 @@ export async function initRepo(
     corsProxyUrl: string,
     force: boolean,
     settings: SettingManager,
-    configWindow: WindowOpenerParams): Promise<GitController> {
+    configWindow: WindowOpenerParams): Promise<IsoGitWrapper> {
 
   settings.configurePane({
     id: 'dataSync',
@@ -442,7 +442,7 @@ export async function initRepo(
 
   const repoUrl = (await settings.getValue('gitRepoUrl') as string) || (await requestRepoUrl(configWindow));
 
-  const gitCtrl = new GitController(fs, repoUrl, upstreamRepoUrl, workDir, corsProxyUrl);
+  const gitCtrl = new IsoGitWrapper(fs, repoUrl, upstreamRepoUrl, workDir, corsProxyUrl);
 
   let doInitialize: boolean;
 
@@ -481,13 +481,13 @@ export async function initRepo(
 export async function requestRepoUrl(configWindow: WindowOpenerParams): Promise<string> {
   return new Promise<string>(async (resolve, reject) => {
 
-    log.warn("SSE: GitController: Open config window to configure repo URL");
+    log.warn("SSE: IsoGitWrapper: Open config window to configure repo URL");
 
     ipcMain.on('set-setting', handleSetting);
 
     function handleSetting(evt: any, name: string, value: string) {
       if (name === 'gitRepoUrl') {
-        log.info("SSE: GitController: received gitRepoUrl setting");
+        log.info("SSE: IsoGitWrapper: received gitRepoUrl setting");
         ipcMain.removeListener('set-setting', handleSetting);
         resolve(value);
       }

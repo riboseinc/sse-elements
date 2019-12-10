@@ -1,16 +1,15 @@
 import * as path from 'path';
 import * as log from 'electron-log';
 
-import { Index, IndexableObject, AnyIDType } from '../../query';
+import { Model, AnyIDType } from '../../models';
+import { Index } from '../../query';
 import { FilesystemBackend } from '../filesystem/base';
 import { GitController } from '../git/controller';
 import { VersionedStore, IDTakenError, CommitError } from './base';
 
 
-export class GitFilesystemStore<
-  O extends IndexableObject<IDType>,
-  FSBackend extends FilesystemBackend<any>,
-  IDType extends AnyIDType>
+export class GitFilesystemStore
+<O extends Model, FSBackend extends FilesystemBackend<any>, IDType extends AnyIDType>
 implements VersionedStore<O, IDType> {
   /* Combines a filesystem storage with Git. */
 
@@ -300,4 +299,4 @@ const IsomorphicGitErrorCodes = {
   AmbiguousShortOid: `AmbiguousShortOid`,
   ShortOidNotFound: `ShortOidNotFound`,
   CheckoutConflictError: `CheckoutConflictError`
-}
+};

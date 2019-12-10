@@ -6,7 +6,7 @@ import AsyncLock from 'async-lock';
 type FilesystemPath = string;
 
 
-export interface FilesystemBackend<T> {
+export interface FilesystemWrapper<T> {
   /* Spec for filesystem backends
      that can be used with Git filesystem object store.
 
@@ -21,31 +21,28 @@ export interface FilesystemBackend<T> {
      Backend is not concerned with files outside this path.
      TODO: Could better be made read-only, behind accessor method. */
 
-  read(objId: string): Promise<T>;
+  read(objID: string, ...args: any[]): Promise<T>;
 
-  readAll(): Promise<T[]>;
+  readAll(...args: any[]): Promise<T[]>;
   /* Scan filesystem and returns all the objects found. */
 
-  write(objId: string, newData: T | undefined): Promise<FilesystemPath[]>;
+  write(objID: string, newData: T | undefined, ...args: any[]): Promise<FilesystemPath[]>;
   /* Updates given object and returns a list of filesystem paths that could be affected.
      If `newData` is undefined, the object is expected to be deleted. */
 
 
   // TODO: Following two can be renamed for clarity.
 
-  expandPath(objId: string): string;
+  expandPath(objID: string): string;
   /* Returns an absolute path to object file or root directory,
      given object ID. Adds an extension where applicable.
      Used by read(), write() under the hood. TODO: Should be made private? */
 
-  resolveObjectId(path: string): Promise<string>;
-  /* Given path, returns object’s FS backend ID. */
-
-  exists(objId: string): Promise<boolean>;
+  exists(objID: string): Promise<boolean>;
   /* Given object ID, returns true if the object actually exists.
      Used when storing e.g. to avoid overwriting an existing object. */
 
-  isValidId(filepath: string): Promise<boolean>;
+  isValidID(filepath: string): Promise<boolean>;
   /* Given a path, returns true if it looks like a valid object ID.
 
      This is intended to be used for weeding out random files
@@ -58,7 +55,7 @@ export interface FilesystemBackend<T> {
 }
 
 
-export abstract class AbstractLockingFilesystemBackend<T> implements FilesystemBackend<T> {
+export abstract class AbstractLockingFilesystemWrapper<T> implements FilesystemWrapper<T> {
   /* Basic filesystem backend around Node.js fs-extra,
      providing stub methods for parsing/dumping data from/to raw string file contents
      and implementing locking around file reads/writes
@@ -71,8 +68,8 @@ export abstract class AbstractLockingFilesystemBackend<T> implements FilesystemB
     this.fileAccessLock = new AsyncLock();
   }
 
-  public expandPath(objId: string) {
-    return path.join(this.baseDir, objId);
+  public expandPath(objID: string) {
+    return path.join(this.baseDir, objID);
   }
 
   public makeRelativePath(absPath: string) {
@@ -83,42 +80,34 @@ export abstract class AbstractLockingFilesystemBackend<T> implements FilesystemB
     }
   }
 
-  public async isValidId(value: string) {
+  public async isValidID(value: string) {
     return true;
   }
 
-  public async resolveObjectId(filepath: string) {
-    const objId = filepath.split(path.sep)[0];
-    if (!objId || !(await this.isValidId(objId))) {
-      throw new Error(`Unable to resolve object ID for path ${filepath}`);
-    }
-    return objId;
-  }
-
-  public async readAll() {
-    const objIds = await fs.readdir(this.baseDir);
+  public async readAll(...args: any[]) {
+    const objIDs = await fs.readdir(this.baseDir);
     var objs = [];
-    for (const objId of objIds) {
-      if (await this.isValidId(objId)) {
-        objs.push(await this.read(objId));
+    for (const objID of objIDs) {
+      if (await this.isValidID(objID)) {
+        objs.push(await this.read(objID, ...args));
       }
     }
     return objs;
   }
 
-  public async exists(objId: string) {
-    return await fs.pathExists(this.expandPath(objId));
+  public async exists(objID: string) {
+    return await fs.pathExists(this.expandPath(objID));
   }
 
-  public async read(objId: string) {
-    const filePath = this.expandPath(objId);
+  public async read(objID: string, ...args: any[]) {
+    const filePath = this.expandPath(objID);
     return await this.fileAccessLock.acquire(filePath, async () => {
       return this.parseData(await fs.readFile(filePath, { encoding: 'utf8' }));
     });
   }
 
-  public async write(objId: string, newContents: T | undefined) {
-    const filePath = this.expandPath(objId);
+  public async write(objID: string, newContents: T | undefined, ...args: any[]) {
+    const filePath = this.expandPath(objID);
     return await this.fileAccessLock.acquire(filePath, async () => {
       if (newContents !== undefined) {
         await fs.writeFile(filePath, this.dumpData(newContents), { encoding: 'utf8' });
