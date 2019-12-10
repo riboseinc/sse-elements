@@ -28,7 +28,12 @@ export class GitController {
 
   constructor(
       private fs: any,
+
       private repoUrl: string,
+      private authorName: string,
+      private authorEmail: string,
+      private username: string,
+
       private upstreamRepoUrl: string,
       public workDir: string,
       private corsProxy: string) {
@@ -77,15 +82,19 @@ export class GitController {
 
     log.verbose("SSE: GitController: Initialize: Cloning", this.repoUrl);
 
+    this.loadAuth();
+
     await git.clone({
       dir: this.workDir,
       url: this.repoUrl,
       ref: 'master',
       singleBranch: true,
-      depth: 5,
+      depth: 1,
       corsProxy: this.corsProxy,
       ...this.auth,
     });
+
+    log.verbose("SSE: GitController: Initialize: Cloned");
 
     await git.addRemote({
       dir: this.workDir,
@@ -109,13 +118,13 @@ export class GitController {
   }
 
   async loadAuth() {
-    /* Configure auth with git-config username, if set.
-       Supposed to be happening automatically? Maybe not.
-       This method must be manually called before making operations that need auth. */
-    const username = await this.configGet('credentials.username');
-    if (username) {
-      this.auth.username = username;
+    if (await this.isInitialized()) {
+      await this.configSet('user.name', this.authorName);
+      await this.configSet('user.email', this.authorEmail);
+      await this.configSet('credentials.username', this.username);
     }
+
+    this.auth.username = this.username;
   }
 
   async pull() {
@@ -326,7 +335,15 @@ export class GitController {
     return await this.stagingLock.acquire('1', async () => {
       log.verbose("SSE: Git: Starting sync");
 
-      const hasUncommittedChanges = await this.checkUncommitted();
+      const isInitialized = await this.isInitialized();
+      await this.loadAuth();
+
+      let hasUncommittedChanges: boolean;
+      if (!isInitialized) {
+        hasUncommittedChanges = false;
+      } else {
+        hasUncommittedChanges = await this.checkUncommitted();
+      }
 
       if (!hasUncommittedChanges) {
 
@@ -341,33 +358,45 @@ export class GitController {
             return;
           }
 
-          await sendRemoteStatus({ isPulling: true });
-          try {
-            await this.pull();
-          } catch (e) {
-            log.error(e);
+          if (isInitialized) {
+            await sendRemoteStatus({ isPulling: true });
+            try {
+              await this.pull();
+            } catch (e) {
+              log.error(e);
+              await sendRemoteStatus({ isPulling: false });
+              await this._handleGitError(e);
+              return;
+            }
             await sendRemoteStatus({ isPulling: false });
-            await this._handleGitError(e);
-            return;
-          }
-          await sendRemoteStatus({ isPulling: false });
 
-          await sendRemoteStatus({ isPushing: true });
-          try {
-            await this.push();
-          } catch (e) {
-            log.error(e);
+            await sendRemoteStatus({ isPushing: true });
+            try {
+              await this.push();
+            } catch (e) {
+              log.error(e);
+              await sendRemoteStatus({ isPushing: false });
+              await this._handleGitError(e);
+              return;
+            }
             await sendRemoteStatus({ isPushing: false });
-            await this._handleGitError(e);
+
+            await sendRemoteStatus({
+              statusRelativeToLocal: 'updated',
+              isMisconfigured: false,
+              needsPassword: false,
+            });
+
+          } else {
+            await sendRemoteStatus({ isPulling: true });
+            await this.forceInitialize();
+            await sendRemoteStatus({
+              statusRelativeToLocal: 'updated',
+              isMisconfigured: false,
+              needsPassword: false,
+            });
             return;
           }
-          await sendRemoteStatus({ isPushing: false });
-
-          await sendRemoteStatus({
-            statusRelativeToLocal: 'updated',
-            isMisconfigured: false,
-            needsPassword: false,
-          });
         }
       }
     });
@@ -440,31 +469,35 @@ export async function initRepo(
     'dataSync',
   ));
 
+  settings.register(new Setting<string>(
+    'gitUsername',
+    "Username",
+    'dataSync',
+  ));
+
+  settings.register(new Setting<string>(
+    'gitAuthorName',
+    "Author name",
+    'dataSync',
+  ));
+
+  settings.register(new Setting<string>(
+    'gitAuthorEmail',
+    "Author email",
+    'dataSync',
+  ));
+
   const repoUrl = (await settings.getValue('gitRepoUrl') as string) || (await requestRepoUrl(configWindow));
 
-  const gitCtrl = new GitController(fs, repoUrl, upstreamRepoUrl, workDir, corsProxyUrl);
+  const authorName = await settings.getValue('gitAuthorName') as string;
+  const authorEmail = await settings.getValue('gitAuthorEmail') as string;
+  const username = await settings.getValue('gitUsername') as string;
 
-  let doInitialize: boolean;
+  const gitCtrl = new GitController(fs, repoUrl, authorName, authorEmail, username, upstreamRepoUrl, workDir, corsProxyUrl);
 
-  if (force === true) {
-    log.warn("SSE: Git is being force reinitialized");
-    doInitialize = true;
-  } else if (!(await gitCtrl.isInitialized())) {
-    log.warn("SSE: Git is not initialized yet");
-    doInitialize = true;
-  } else if (!(await gitCtrl.isUsingRemoteURLs({ origin: repoUrl, upstream: upstreamRepoUrl }))) {
-    log.warn("SSE: Git has mismatching remote URLs, reinitializing");
-    doInitialize = true;
-  } else {
-    log.info("SSE: Git is already initialized");
-    doInitialize = false;
+  if (await gitCtrl.isInitialized()) {
+    await gitCtrl.loadAuth();
   }
-
-  if (doInitialize) {
-    await gitCtrl.forceInitialize();
-  }
-
-  await gitCtrl.loadAuth();
 
   return gitCtrl;
 }
