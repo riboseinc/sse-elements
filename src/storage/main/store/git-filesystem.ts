@@ -73,6 +73,26 @@ implements VersionedStore<O, IDType> {
     });
   }
 
+  public async findAll(query?: string) {
+    const idx = await this.getIndex();
+    if (query !== undefined) {
+      var resultIdx: { [key: string]: O } = {};
+      for (const key of Object.keys(idx)) {
+        const obj = idx[key];
+        if (this.objectMatchesQuery(obj, query)) {
+          resultIdx[key] = obj;
+        }
+      }
+      return resultIdx;
+    } else {
+      return idx;
+    }
+  }
+
+  public objectMatchesQuery(obj: O, query: string): boolean {
+    return false;
+  }
+
   public async getIndex() {
     const objs: O[] = await this.fs.readAll();
     var idx: Index<O> = {};
