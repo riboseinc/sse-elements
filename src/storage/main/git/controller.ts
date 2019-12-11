@@ -156,7 +156,8 @@ export class GitController {
     return await git.commit({
       dir: this.workDir,
       message: msg,
-      author: {},  // git-config values will be used
+      author: { name: this.authorName, email: this.authorEmail },
+      // git-config values should be used theoretically, but there’s a quirk there.
     });
   }
 
