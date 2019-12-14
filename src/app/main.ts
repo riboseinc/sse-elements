@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { app, App } from 'electron';
 import * as log from 'electron-log';
 import { AppConfig, Window } from '../config/app';
 import { MainConfig } from '../config/main';
@@ -63,6 +63,7 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
   });
 
   return {
+    app,
     isMacOS,
     isDevelopment,
     managers,
@@ -72,6 +73,7 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
 
 
 interface MainApp<A extends AppConfig, M extends MainConfig<A>> {
+  app: App,
   isMacOS: boolean
   isDevelopment: boolean
   managers: Record<keyof A["data"], VersionedManager<any, any>>
