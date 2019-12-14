@@ -1,8 +1,11 @@
 import { app } from 'electron';
 import * as log from 'electron-log';
-import { AppConfig } from '../config/app';
+import { AppConfig, Window } from '../config/app';
 import { MainConfig } from '../config/main';
 import { VersionedFilesystemBackend, VersionedManager } from '../db/main/base';
+
+import { makeWindowEndpoint } from '../api/main';
+import { openWindow } from '../main/window';
 
 
 export const initMain = async <C extends MainConfig<any>>(config: C): Promise<MainApp<any, C>> => {
@@ -43,6 +46,21 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
     const manager = new ManagerClass(db, managerConf.options, modelConf);
     return { [modelName]: manager };
   }))).reduce((val, acc) => ({ ...acc, ...val }), {} as Partial<Managers>) as Managers;
+
+  app.whenReady()
+  .then(() => {
+    const defaultWindowParams = config.app.windows.default.openerParams;
+    openWindow({
+      ...defaultWindowParams,
+      component: 'default',
+    });
+    for (const [windowName, window] of Object.entries(config.app.windows)) {
+      makeWindowEndpoint(windowName, () => ({
+        ...(window as Window).openerParams,
+        component: windowName,
+      }));
+    }
+  });
 
   return {
     isMacOS,
