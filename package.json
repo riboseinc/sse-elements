@@ -40,7 +40,7 @@
     "react-dom": "^16.11.0",
     "sass-loader": "^8.0.0",
     "typescript": "^3.6.4",
-    "webpack": "~4.36.0"
+    "webpack": "~4.41.5"
   },
   "dependencies": {
     "@isomorphic-git/lightning-fs": "^3.3.3",
