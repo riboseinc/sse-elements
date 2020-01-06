@@ -43,13 +43,27 @@ export interface ManagerClass<M extends Model, DB extends DatabaseBackend> {
 }
 
 export interface ManagerOptions<M extends Model> {
+  /* Options specific to Isomorphic Git-YAML model manager.
+     TODO: Should be moved into isogit-yaml module. */
+
+  // Model manager class resolver
   cls: () => Promise<{ default: ManagerClass<M, any> }>
+
+  // Path to data for this model, relative to DB’s work directory
   workDir: string
+
+  // List of fields that go into meta.yaml
   metaFields: (keyof M)[]
+
+  // Name of model field containing unqiue identifier equivalent
   idField: keyof M
 }
 
 export interface ManagerConfig<D extends Record<string, DatabaseConfig>> {
+  // The corresponding key in MainConfig["databases"]
   dbName: string
+
+  // Any options to be passed to manager constructor,
+  // must conform to class in corresponding ManagerOptions
   options: ManagerOptions<any>
 }
