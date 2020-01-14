@@ -1,9 +1,35 @@
-import React, { useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { Icon } from '@blueprintjs/core';
 
 import { SupportedLanguages, LangConfig, Translatable } from './types';
 
 import styles from './styles.scss';
+
+
+type LocalizerOptions<Languages extends SupportedLanguages> = {
+  languageSetup: {
+    available: Languages
+    default: keyof Languages
+    selected: keyof Languages
+  }
+};
+const LocalizerContextProvider: React.FC<LocalizerOptions<any>> = function ({ languageSetup, children }) {
+  const [langConfig, setLangConfig] = useState({
+    available: languageSetup.available,
+    default: languageSetup.default as string,
+    selected: languageSetup.selected as string,
+    select: (langId: keyof typeof languageSetup.available) => {
+      setLangConfig(langConfig => Object.assign({}, langConfig, { selected: langId }));
+    },
+  });
+
+  return (
+    <LangConfigContext.Provider value={langConfig}>
+      {children}
+    </LangConfigContext.Provider>
+  );
+};
+export default LocalizerContextProvider;
 
 
 interface LangConfigContextSpec extends LangConfig {
