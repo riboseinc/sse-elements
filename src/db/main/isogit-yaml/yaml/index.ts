@@ -20,7 +20,7 @@ interface YAMLDirectoryStoreableContents extends YAML {
 }
 
 
-export class YAMLWrapper<T extends YAML> extends AbstractLockingFilesystemWrapper<T> {
+export class YAMLWrapper<T extends YAML = YAML> extends AbstractLockingFilesystemWrapper<T> {
   protected isYAMLFile(objID: string) {
     return path.extname(objID) === YAML_EXT;
   }
