@@ -13,13 +13,6 @@ export interface ModelConfig {
 }
 
 
-interface LanguageConfig {
-  available: Record<string, string>
-  selected: keyof this["available"]
-  default: keyof this["available"]
-}
-
-
 export interface AppConfig {
   data: Record<string, ModelConfig>
 
@@ -28,7 +21,6 @@ export interface AppConfig {
     [windowName: string]: Window
   }
 
-  languages: LanguageConfig
 
   help: {
     rootURL: string
