@@ -10,6 +10,10 @@ export interface Backend<IDType = AnyIDType> {
   create<T extends Record<string, any>>(obj: T, ...args: any[]): Promise<void>
   update<T extends Record<string, any>>(objID: IDType, obj: T, ...args: any[]): Promise<void>
   delete(objID: IDType, ...args: any[]): Promise<void>
+
+  setUpIPC?(dbID: string): void
+  /* Initializes IPC endpoints to enable e.g. to configure the database
+     or invoke specific utility methods from within app’s renderer process. */
 }
 
 
