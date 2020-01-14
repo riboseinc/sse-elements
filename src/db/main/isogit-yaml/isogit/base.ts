@@ -1,17 +1,10 @@
 import * as dns from 'dns';
 import * as path from 'path';
-import * as fs from 'fs-extra';
 import AsyncLock from 'async-lock';
 import * as git from 'isomorphic-git';
 import * as log from 'electron-log';
 
-import { ipcMain } from 'electron';
-
-import { listen } from '../../../api/main';
-import { Setting, SettingManager } from '../../../settings/main';
-import { notifyAllWindows, WindowOpenerParams, openWindow } from '../../../main/window';
-
-import { RemoteStorageStatus } from '../remote';
+import { notifyAllWindows } from '../../../../main/window';
 
 import { GitAuthentication } from './types';
 
@@ -35,7 +28,7 @@ export class IsoGitWrapper {
 
     git.plugins.set('fs', fs);
 
-    this.stagingLock = new AsyncLock({ timeout: 20000, maxPending: 10 });
+    this.stagingLock = new AsyncLock({ timeout: 20000, maxPending: 2 });
 
     // Makes it easier to bind these to IPC events
     this.synchronize = this.synchronize.bind(this);
@@ -372,130 +365,6 @@ export class IsoGitWrapper {
       }
     });
   }
-
-
-  /* IPC endpoint setup */
-
-  setUpAPIEndpoints() {
-    log.verbose("SSE: IsoGitWrapper: Setting up API endpoints");
-
-    listen<{ name: string, email: string, username: string }, { success: true }>
-    ('git-config-set', async ({ name, email, username }) => {
-      log.verbose("SSE: IsoGitWrapper: received git-config-set request");
-
-      await this.configSet('user.name', name);
-      await this.configSet('user.email', email);
-      await this.configSet('credentials.username', username);
-
-      this.auth.username = username;
-
-      this.synchronize();
-
-      return { success: true };
-    });
-
-    listen<{ password: string }, { success: true }>
-    ('git-set-password', async ({ password }) => {
-      // WARNING: Don’t log password
-      log.verbose("SSE: IsoGitWrapper: received git-set-password request");
-
-      this.setPassword(password);
-      this.synchronize();
-
-      return { success: true };
-    });
-
-    listen<{}, { originURL: string | null, name: string | null, email: string | null, username: string | null }>
-    ('git-config-get', async () => {
-      log.verbose("SSE: IsoGitWrapper: received git-config request");
-      return {
-        originURL: await this.getOriginUrl(),
-        name: await this.configGet('user.name'),
-        email: await this.configGet('user.email'),
-        username: await this.configGet('credentials.username'),
-        // Password must not be returned, of course
-      };
-    });
-  }
-}
-
-
-export async function initRepo(
-    workDir: string,
-    upstreamRepoUrl: string,
-    corsProxyUrl: string,
-    force: boolean,
-    settings: SettingManager,
-    configWindow: WindowOpenerParams): Promise<IsoGitWrapper> {
-
-  settings.configurePane({
-    id: 'dataSync',
-    label: "Data synchronization",
-    icon: 'git-merge',
-  });
-
-  settings.register(new Setting<string>(
-    'gitRepoUrl',
-    "Git repository URL",
-    'dataSync',
-  ));
-
-  const repoUrl = (await settings.getValue('gitRepoUrl') as string) || (await requestRepoUrl(configWindow));
-
-  const gitCtrl = new IsoGitWrapper(fs, repoUrl, upstreamRepoUrl, workDir, corsProxyUrl);
-
-  let doInitialize: boolean;
-
-  if (force === true) {
-    log.warn("SSE: Git is being force reinitialized");
-    doInitialize = true;
-  } else if (!(await gitCtrl.isInitialized())) {
-    log.warn("SSE: Git is not initialized yet");
-    doInitialize = true;
-  } else if (!(await gitCtrl.isUsingRemoteURLs({ origin: repoUrl, upstream: upstreamRepoUrl }))) {
-    log.warn("SSE: Git has mismatching remote URLs, reinitializing");
-    doInitialize = true;
-  } else {
-    log.info("SSE: Git is already initialized");
-    doInitialize = false;
-  }
-
-  if (doInitialize) {
-    await gitCtrl.forceInitialize();
-  }
-
-  await gitCtrl.loadAuth();
-
-  return gitCtrl;
-}
-
-
-/* Promises to return an object containing string with repository URL
-   and a flag indicating whether it’s been reset
-   (which if true would cause `initRepo()` to reinitialize the repository).
-
-   If repository URL is not configured (e.g., on first run, or after reset)
-   opens a window with specified options to ask the user to provide the setting.
-   The window is expected to ask the user to specify the URL and send a `'set-setting'`
-   event for `'gitRepoUrl'`. */
-export async function requestRepoUrl(configWindow: WindowOpenerParams): Promise<string> {
-  return new Promise<string>(async (resolve, reject) => {
-
-    log.warn("SSE: IsoGitWrapper: Open config window to configure repo URL");
-
-    ipcMain.on('set-setting', handleSetting);
-
-    function handleSetting(evt: any, name: string, value: string) {
-      if (name === 'gitRepoUrl') {
-        log.info("SSE: IsoGitWrapper: received gitRepoUrl setting");
-        ipcMain.removeListener('set-setting', handleSetting);
-        resolve(value);
-      }
-    }
-
-    await openWindow(configWindow);
-
-  });
 }
 
 
@@ -511,6 +380,18 @@ async function checkOnlineStatus(): Promise<boolean> {
 }
 
 
-async function sendRemoteStatus(update: Partial<RemoteStorageStatus>) {
+async function sendRemoteStatus(update: Partial<RemoteStatus>) {
   await notifyAllWindows('remote-storage-status', update);
+}
+
+
+
+export interface RemoteStatus {
+  isMisconfigured: boolean,
+  isOffline: boolean,
+  hasLocalChanges: boolean,
+  needsPassword: boolean,
+  statusRelativeToLocal: 'ahead' | 'behind' | 'diverged' | 'updated' | undefined,
+  isPushing: boolean,
+  isPulling: boolean,
 }

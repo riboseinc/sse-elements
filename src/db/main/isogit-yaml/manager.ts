@@ -1,12 +1,13 @@
 import * as path from 'path';
-//import * as log from 'electron-log';
+
+import { listen } from '../../../api/main';
 
 import { ModelConfig } from '../../../config/app';
 import { ManagerOptions } from '../../../config/main';
 import { Model, AnyIDType } from '../../models';
 import { Index } from '../../query';
-import { VersionedManager, VersionedFilesystemManager, CommitError } from '../base';
-import { Backend, isGitError } from './base';
+import { VersionedFilesystemBackend, VersionedManager, VersionedFilesystemManager, CommitError } from '../base';
+import { isGitError } from './base';
 
 
 class Manager<M extends Model, IDType extends AnyIDType>
@@ -14,7 +15,7 @@ implements VersionedManager<M, IDType>, VersionedFilesystemManager {
   /* Combines a filesystem storage with Git. */
 
   constructor(
-      private db: Backend,
+      private db: VersionedFilesystemBackend,
       private managerConfig: ManagerOptions<M>,
       private modelConfig: ModelConfig) {
     db.registerManager(this as VersionedFilesystemManager);
@@ -40,7 +41,9 @@ implements VersionedManager<M, IDType>, VersionedFilesystemManager {
   }
 
   public async read(objID: IDType) {
-    return await this.db.read(this.getDBRef(objID), this.managerConfig.metaFields as string[]) as M;
+    return await this.db.read(
+      this.getDBRef(objID),
+      this.managerConfig.metaFields as string[]) as M;
   }
 
   public async commit(objIDs: IDType[], message: string) {
@@ -56,16 +59,20 @@ implements VersionedManager<M, IDType>, VersionedFilesystemManager {
   }
 
   public async listUncommitted() {
-    const dbRefs = await this.db.listUncommitted();
+    if (this.db.listUncommitted) {  
+      const dbRefs = await this.db.listUncommitted();
 
-    const objIDs: IDType[] = dbRefs.
-      filter(ref => this.managesFileAtPath(ref)).
-      map(ref => this.getObjID(ref));
+      const objIDs: IDType[] = dbRefs.
+        filter(ref => this.managesFileAtPath(ref)).
+        map(ref => this.getObjID(ref));
 
-    return objIDs.filter(function (objID, idx, self) {
-      // Discard any duplicates from the list of object IDs
-      return idx === self.indexOf(objID);
-    });
+      return objIDs.filter(function (objID, idx, self) {
+        // Discard duplicates from the list
+        return idx === self.indexOf(objID);
+      });
+    } else {
+      throw new Error("listUncommitted() is not implemented by DB backend");
+    }
   }
 
   public async readAll() {
@@ -142,6 +149,39 @@ implements VersionedManager<M, IDType>, VersionedFilesystemManager {
     // }
 
     return baseComponent as IDType;
+  }
+
+  public setUpIPC(modelName: string) {
+    const prefix = `model-${modelName}`;
+
+    listen<{}, Index<M>>
+    (`${prefix}-read-all`, async () => {
+      return await this.readAll();
+    })
+
+    listen<{ objectID: IDType }, M>
+    (`${prefix}-read-one`, async ({ objectID }) => {
+      return await this.read(objectID);
+    })
+
+    listen<{}, IDType[]>
+    (`${prefix}-read-uncommitted-ids`, async () => {
+      return await this.listUncommitted();
+    })
+
+    listen<
+      { objectIDs: IDType[], commitMessage: string },
+      { success: true }>
+    (`${prefix}-commit-objects`, async ({ objectIDs, commitMessage }) => {
+      await this.commit(objectIDs, commitMessage);
+      return { success: true };
+    })
+
+    listen<{ objectIDs: IDType[] }, { success: true }>
+    (`${prefix}-discard-all-uncommitted`, async ({ objectIDs }) => {
+      await this.discard(objectIDs);
+      return { success: true };
+    })
   }
 }
 

@@ -1,29 +1,145 @@
 import * as log from 'electron-log';
+import * as fs from 'fs-extra';
 
-import { DatabaseBackendOptions } from '../../../config/main';
+import { ipcMain } from 'electron';
+
+import { listen } from '../../../api/main';
+
 import { Index } from '../../query';
 
-import { VersionedFilesystemBackend, VersionedFilesystemManager } from '../base';
+import { Setting, SettingManager } from '../../../settings/main';
+import { BackendClass, VersionedFilesystemBackend, VersionedFilesystemManager } from '../base';
 import { YAMLDirectoryWrapper } from './yaml';
 import { IsoGitWrapper } from './isogit';
 import { UniqueConstraintError } from '../../errors';
 
 
-export class Backend implements VersionedFilesystemBackend {
+export interface FixedBackendOptions {
+  /* Settings supplied by the developer */
+
+  workDir: string
+  corsProxyURL: string
+  upstreamRepoURL: string
+}
+
+
+export interface ConfigurableBackendOptions {
+  /* Settings that user can or must specify */
+  repoURL: string
+  username: string
+  authorName: string
+  authorEmail: string
+}
+
+
+export type BackendOptions = FixedBackendOptions & ConfigurableBackendOptions
+
+export type InitialBackendOptions = FixedBackendOptions & Partial<ConfigurableBackendOptions>
+
+
+export const Backend: BackendClass<InitialBackendOptions, BackendOptions> = class Backend
+implements VersionedFilesystemBackend {
   /* Combines a filesystem storage with Git. */
 
   private git: IsoGitWrapper;
   private fs: YAMLDirectoryWrapper;
   private managers: VersionedFilesystemManager[];
 
-  constructor(private opts: DatabaseBackendOptions) {
+  constructor(private opts: BackendOptions) {
     this.fs = new YAMLDirectoryWrapper(this.opts.workDir);
+
+    this.git = new IsoGitWrapper(
+      fs,
+      this.opts.repoURL,
+      this.opts.upstreamRepoURL,
+      this.opts.workDir,
+      this.opts.corsProxyURL,
+    );
 
     this.managers = [];
 
     // this.collections = Object.entries(this.opts.collections).map(([collectionID, collectionOptions]) => {
     //   return { [collectionID]: { index: {}, opts: collectionOptions } } as Partial<Collections>;
     // }).reduce((val, acc) => ({ ...acc, ...val }), {} as Partial<Collections>) as Collections;
+  }
+
+  public static registerSettingsForConfigurableOptions(
+      settings: SettingManager,
+      initialOptions: InitialBackendOptions,
+      dbID: string) {
+
+    const paneLabelPostfix = dbID !== 'default' ? ` for “${dbID}”` : '';
+    const settingIDPrefix = `${dbID}_`;
+    const paneID = `dataSources_${dbID}`;
+
+    settings.configurePane({
+      id: paneID,
+      label: `Database settings${paneLabelPostfix}`,
+      icon: 'git-merge',
+    });
+
+    settings.register(new Setting<string>(
+      paneID,
+      `${settingIDPrefix}gitRepoUrl`,
+      'text',
+      initialOptions.repoURL === undefined,
+      "Git repository URL",
+    ));
+
+    settings.register(new Setting<string>(
+      paneID,
+      `${settingIDPrefix}gitUsername`,
+      'text',
+      initialOptions.username === undefined,
+      "Git username",
+    ));
+
+    settings.register(new Setting<string>(
+      paneID,
+      `${settingIDPrefix}gitAuthorName`,
+      'text',
+      initialOptions.authorName === undefined,
+      "Git author name",
+    ));
+
+    settings.register(new Setting<string>(
+      paneID,
+      `${settingIDPrefix}gitAuthorEmail`,
+      'text',
+      initialOptions.authorEmail === undefined,
+      "Git author email",
+    ));
+  }
+
+  public static async completeOptionsFromSettings(
+      settings: SettingManager,
+      availableOptions: InitialBackendOptions,
+      dbID: string) {
+
+    const settingIDPrefix = `${dbID}_`;
+
+    async function getSetting<T>(settingID: string): Promise<T> {
+      return await settings.getValue(`${settingIDPrefix}${settingID}`) as T;
+    }
+
+    return {
+      workDir: availableOptions.workDir,
+      corsProxyURL: availableOptions.corsProxyURL,
+      upstreamRepoURL: availableOptions.upstreamRepoURL,
+
+      repoURL: (
+        (await getSetting<string>('gitRepoUrl'))
+        || availableOptions.repoURL) as string,
+      username: (
+        (await getSetting<string>('gitUsername'))
+        || availableOptions.username) as string,
+      authorName: (
+        (await getSetting<string>('gitAuthorName'))
+        || availableOptions.authorName) as string,
+      authorEmail: (
+        (await getSetting<string>('gitAuthorEmail'))
+        || availableOptions.authorEmail) as string,
+    }
   }
 
   public getWorkDir() {
@@ -34,7 +150,31 @@ export class Backend implements VersionedFilesystemBackend {
     this.managers.push(manager);
   }
 
-  public async init() {}
+  public async init(forceReset = false) {
+    let doInitialize: boolean;
+
+    if (forceReset === true) {
+      log.warn("SSE: Git is being force reinitialized");
+      doInitialize = true;
+    } else if (!(await this.git.isInitialized())) {
+      log.warn("SSE: Git is not initialized yet");
+      doInitialize = true;
+    } else if (!(await this.git.isUsingRemoteURLs({
+        origin: this.opts.repoURL,
+        upstream: this.opts.upstreamRepoURL}))) {
+      log.warn("SSE: Git has mismatching remote URLs, reinitializing");
+      doInitialize = true;
+    } else {
+      log.info("SSE: Git is already initialized");
+      doInitialize = false;
+    }
+
+    if (doInitialize) {
+      await this.git.forceInitialize();
+    }
+
+    await this.git.loadAuth();
+  }
 
   public async authenticate() {
     // Authenticates Git
@@ -80,6 +220,7 @@ export class Backend implements VersionedFilesystemBackend {
     const objIDs: string[] = files.
       map(fileinfo => fileinfo.path);
 
+    // Discard duplicates from the list
     return objIDs.filter(function (objID, idx, self) {
       return idx === self.indexOf(objID);
     });
@@ -134,6 +275,55 @@ export class Backend implements VersionedFilesystemBackend {
   private getRef(objID: string | number): string {
     /* Returns FS backend reference given object ID. */
     return `${objID}`;
+  }
+
+  public setUpIPC(dbID: string) {
+    log.verbose("SSE: IsoGitWrapper: Setting up IPC");
+
+    const prefix = `db-${dbID}`;
+
+    ipcMain.on(`${prefix}-git-trigger-sync`, this.git.synchronize);
+    ipcMain.on(`${prefix}-git-discard-unstaged`, () => this.git.resetFiles());
+    ipcMain.on(`${prefix}-git-update-status`, this.git.checkUncommitted);
+
+    listen<{ name: string, email: string, username: string }, { success: true }>
+    (`${prefix}-git-config-set`, async ({ name, email, username }) => {
+      log.verbose("SSE: IsoGitWrapper: received git-config-set request");
+
+      await this.git.configSet('user.name', name);
+      await this.git.configSet('user.email', email);
+      await this.git.configSet('credentials.username', username);
+
+      await this.git.loadAuth();
+      // ^ this.git.auth.username = username
+
+      this.git.synchronize();
+
+      return { success: true };
+    });
+
+    listen<{ password: string }, { success: true }>
+    (`${prefix}-git-set-password`, async ({ password }) => {
+      // WARNING: Don’t log password
+      log.verbose("SSE: IsoGitWrapper: received git-set-password request");
+
+      this.git.setPassword(password);
+      this.git.synchronize();
+
+      return { success: true };
+    });
+
+    listen<{}, { originURL: string | null, name: string | null, email: string | null, username: string | null }>
+    (`${prefix}-git-config-get`, async () => {
+      log.verbose("SSE: IsoGitWrapper: received git-config request");
+      return {
+        originURL: await this.git.getOriginUrl(),
+        name: await this.git.configGet('user.name'),
+        email: await this.git.configGet('user.email'),
+        username: await this.git.configGet('credentials.username'),
+        // Password must not be returned, of course
+      };
+    });
   }
 }
 

@@ -1,6 +1,10 @@
 import { AppConfig, ModelConfig } from './app';
 import { Model } from '../db/models';
-import { Backend as DatabaseBackend, VersionedManager } from '../db/main/base';
+import {
+  BackendClass as DatabaseBackendClass,
+  Backend as DatabaseBackend,
+  VersionedManager,
+} from '../db/main/base';
 
 
 export interface MainConfig<App extends AppConfig> {
@@ -19,22 +23,14 @@ export interface MainConfig<App extends AppConfig> {
 }
 
 
-interface DatabaseConfig {
-  backend: () => Promise<{ default: DatabaseBackendClass }>
-  options: DatabaseBackendOptions
-}
-
-
 // Databases
 
-export interface DatabaseBackendClass {
-  new (options: DatabaseBackendOptions): DatabaseBackend
-}
+interface DatabaseConfig {
+  backend: () => Promise<{ default: DatabaseBackendClass<any, any> }>
 
-export interface DatabaseBackendOptions {
-  workDir: string,
-  repoURL: string,
-  corsProxyURL: string,
+  // If not all options are supplied in configuration in code,
+  // the missing ones will be required from the user via initial configuration window.
+  options: any
 }
 
 

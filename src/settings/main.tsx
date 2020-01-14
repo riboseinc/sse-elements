@@ -15,11 +15,31 @@ export interface Pane {
 
 export class Setting<T> {
   constructor(
+
+    public paneId: string,
+    /* ID of the pane to show the setting under. */
+
     public id: string,
+    /* Setting ID should be unique across all settings. */
+
+    public input: 'text' | 'number',
+    /* Determines input widget shown by default. */
+
+    public required: boolean,
+    /* Indicates whether the setting is required for app operation. */
+
     public label: string,
-    public paneId: string) {}
-  toUseable(val: unknown): T { return val as T };
-  toStoreable(val: T): any { return val as any };
+    /* Setting label shown to the user should be unique within given pane,
+       to avoid confusion. */
+
+  ) {}
+
+  toUseable(val: unknown): T { return val as T }
+  /* Converts stored setting value to useable object. */
+
+  toStoreable(val: T): any { return val as any }
+  /* Converts JS/TS object to storeable version of the setting. */
+
 }
 
 
@@ -32,6 +52,16 @@ export class SettingManager {
   constructor(public settingsPath: string) {
     log.debug(`SSE: Settings: Configuring settings with path ${settingsPath}`);
     this.yaml = new YAMLStorage(fs);
+  }
+
+  public async listMissingRequiredSettings(): Promise<string[]> {
+    var requiredSettingIDs: string[] = [];
+    for (const setting of this.registry) {
+      if (setting.required == true && (await this.getValue(setting.id)) === undefined) {
+        requiredSettingIDs.push(setting.id);
+      }
+    }
+    return requiredSettingIDs;
   }
 
   public async getValue(id: string): Promise<unknown> {
@@ -106,7 +136,7 @@ export class SettingManager {
     this.panes.push(pane);
   }
 
-  public setUpAPIEndpoints() {
+  public setUpIPC() {
     log.verbose("SSE: Settings: Configure API endpoints");
 
     ipcMain.on('set-setting', async (evt: any, name: string, value: any) => {
