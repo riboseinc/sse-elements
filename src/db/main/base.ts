@@ -1,4 +1,5 @@
 import { AnyIDType, Model } from '../models';
+import { SettingManager } from '../../settings/main';
 import { Index } from '../query';
 
 
@@ -14,6 +15,34 @@ export interface Backend<IDType = AnyIDType> {
   setUpIPC?(dbID: string): void
   /* Initializes IPC endpoints to enable e.g. to configure the database
      or invoke specific utility methods from within app’s renderer process. */
+}
+
+
+export interface BackendClass<InitialOptions extends object, Options extends InitialOptions> {
+  /* Initial options are supplied by the developer.
+     Full options include options configurable by the user, some of which may be required.
+     NOTE: By “Option”, backend constructor parameter is meant.
+     TODO: This is a misnomer since some of those are non-optional. */
+
+  new (options: Options): Backend
+  // Constructor signature
+
+  registerSettingsForConfigurableOptions?(
+    settings: SettingManager,
+    initialOptions: Partial<InitialOptions>,
+    dbID: string): void
+  /* Given initial options and a settings manager,
+     register user-configurable settings that control this DB’s behavior.
+     This method can make a setting required if corresponding option
+     is not provided by the developer in the initial options. */
+
+  completeOptionsFromSettings?(
+    settings: SettingManager,
+    initialOptions: Partial<InitialOptions>,
+    dbID: string): Promise<Options>
+  /* Given initial options and a settings manager,
+     retrieve any user-configured options if needed
+     and return full options object required by this backend. */
 }
 
 
