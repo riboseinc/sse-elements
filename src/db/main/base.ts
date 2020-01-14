@@ -3,8 +3,6 @@ import { Index } from '../query';
 
 
 export interface Backend<IDType = AnyIDType> {
-  /* Basic object manipulation methods. */
-
   init(): Promise<void>
   authenticate(...args: any[]): Promise<void>
   readAll<T extends Record<string, any>>(...args: any[]): Promise<Index<T>>
@@ -41,7 +39,8 @@ export interface VersionedFilesystemBackend extends VersionedBackend<object, str
 
 
 export interface VersionedManager<M extends Model, IDType extends AnyIDType> {
-  /* Passes calls on to their Backend & VersionedBackend implementations. */
+  /* Passes calls on to corresponding Backend & VersionedBackend methods,
+     but limits their scope only to objects manipulated by this manager. */
 
   create(obj: M, commit: boolean | string): Promise<void>
   update(objID: IDType, obj: M, commit: boolean | string): Promise<void>;
