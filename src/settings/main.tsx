@@ -1,9 +1,10 @@
+import * as path from 'path';
 import * as fs from 'fs-extra';
 import * as log from 'electron-log';
 
 import { ipcMain } from 'electron';
 
-import { YAMLStorage } from '../storage/main/yaml';
+import { YAMLWrapper } from '../db/main/isogit-yaml/yaml/index';
 
 
 export interface Pane {
@@ -47,11 +48,14 @@ export class SettingManager {
   private registry: Setting<any>[] = [];
   private panes: Pane[] = [];
   private data: any | null = null;
-  private yaml: YAMLStorage;
+  private yaml: YAMLWrapper;
+  private settingsPath: string;
 
-  constructor(public settingsPath: string) {
-    log.debug(`SSE: Settings: Configuring settings with path ${settingsPath}`);
-    this.yaml = new YAMLStorage(fs);
+  constructor(public appDataPath: string, public settingsFileName: string) {
+    this.settingsPath = path.join(appDataPath, `${settingsFileName}.yaml`);
+    log.debug(`SSE: Settings: Configuring w/path ${this.settingsPath}`);
+
+    this.yaml = new YAMLWrapper(appDataPath);
   }
 
   public async listMissingRequiredSettings(): Promise<string[]> {
@@ -76,7 +80,7 @@ export class SettingManager {
           settingsFileExists = false;
         }
         if (settingsFileExists) {
-          this.data = (await this.yaml.load(this.settingsPath)) || {};
+          this.data = (await this.yaml.read(this.settingsFileName)) || {};
         } else {
           this.data = {};
         }
@@ -115,7 +119,7 @@ export class SettingManager {
     log.debug("SSE: Settings: Commit: Remove file");
     await fs.remove(this.settingsPath);
     log.debug("SSE: Settings: Commit: Write new file");
-    await this.yaml.store(this.settingsPath, this.data);
+    await this.yaml.write(this.settingsFileName, this.data);
   }
 
   private get(id: string): Setting<any> | undefined {
