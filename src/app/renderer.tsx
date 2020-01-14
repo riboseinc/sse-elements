@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
+import * as log from 'electron-log';
 import * as ReactDOM from 'react-dom';
 import { AppConfig } from '../config/app';
 import { RendererConfig } from '../config/renderer';
 
 import { NonIdealState, Spinner } from '@blueprintjs/core';
-
-import { LangConfigContext } from '../localizer/renderer';
 
 import '!style-loader!css-loader!@blueprintjs/datetime/lib/css/blueprint-datetime.css';
 import '!style-loader!css-loader!@blueprintjs/core/lib/css/blueprint.css';
@@ -18,8 +17,9 @@ interface AppRenderer {
 }
 
 
-// Render application screen in a new window,
-// with given window component and (if applicable) any parameters.
+// Render application screen in a new window
+// with given top-level window UI component and (if applicable) any parameters
+// wrapped in configured context provider components.
 export const renderApp = async <A extends AppConfig, C extends RendererConfig<A>>(config: C): Promise<AppRenderer> => {
 
   // electron-webpack guarantees presence of #app in index.html it bundles
@@ -35,46 +35,57 @@ export const renderApp = async <A extends AppConfig, C extends RendererConfig<A>
   const componentId = searchParams.get('c');
   const componentImporter = componentId ? config.windowComponents[componentId] : null;
 
-  const App: React.FC<{}> = function ({ children }) {
-    /* Top-level abstract component. Renders the requested window UI component
-       wrapped in context processors (potentially more later). */
+  // Fetch top-level UI component class and render it.
+  if (componentImporter) {
+    // Show loading indicator while components are being resolved
+    ReactDOM.render(<Spinner />, appRoot);
 
-    // Top-level window UI component(s) will be passed as children
-    var result = children;
+    // Get props prescribed for each context provider component
+    var ctxProviderOptions = config.contextProviders.map(item => item.opts);
 
-    // Wrap UI component in any context providers configured by app developer
-    for (const ContextProvider of Object.values(config.contextProviders)) {
-      result = <ContextProvider>{result}</ContextProvider>;
+    // Resolve (import) components in parallel, first UI and then context providers
+    const promisedComponents: { default: React.FC<any> }[] = await Promise.all([
+      componentImporter(),
+      ...config.contextProviders.map(async (ctxp) => await ctxp.cls()),
+    ]);
+
+    // Break down components into top-level window UI & context providers
+    const TopWindowComponent = promisedComponents[0].default;
+    var ctxProviderComponents = promisedComponents.
+      slice(1, promisedComponents.length).
+      map(item => item.default);
+
+    // Reorder context providers so that top-most is the most basic
+    ctxProviderComponents.reverse();
+    ctxProviderOptions.reverse();
+
+    // Write out top-level window component JSX
+    var appMarkup = <TopWindowComponent query={searchParams} />;
+
+    log.debug(  
+      `Got context provider components`,
+      ctxProviderComponents);
+
+    // Wrap the JSX into context provider components
+    for (const [idx, ContextProvider] of ctxProviderComponents.entries()) {
+      log.debug(  
+        `Initializing context provider #${idx}`,
+        ctxProviderComponents[idx],
+        ctxProviderOptions[idx]);
+
+      appMarkup = (
+        <ContextProvider {...ctxProviderOptions[idx](config)}>
+          {appMarkup}
+        </ContextProvider>
+      );
     }
 
-    // Configure localization/translation context provider
-    // (currently hard-coded, not user-configurable),
-    // and render the total result wrapped in that
+    // Render the JSX
+    ReactDOM.render(appMarkup, appRoot);
 
-    const [langConfig, setLangConfig] = useState({
-      available: config.app.languages.available,
-      default: config.app.languages.default as string,
-      selected: config.app.languages.selected as string,
-      select: (langId: keyof typeof config.app.languages.available) => {
-        setLangConfig(langConfig => Object.assign({}, langConfig, { selected: langId }));
-      },
-    });
-
-    return (
-      <LangConfigContext.Provider value={langConfig}>
-        {result}
-      </LangConfigContext.Provider>
-    );
-  };
-
-  // Fetch top-level UI component class and render it.
-  // Show loading indicator while it’s being fetched.
-
-  if (componentImporter) {
-    ReactDOM.render(<Spinner />, appRoot);
-    const ComponentClass = (await componentImporter()).default;
-    ReactDOM.render(<App><ComponentClass query={searchParams} /></App>, appRoot);
   } else {
+    // Component specified in GET params is not present in app renderer config.
+    // TODO: Handle misconfigured React context providers and failed import at runtime
     ReactDOM.render(<NonIdealState
       icon="error"
       title="Unknown component requested" />, appRoot);
