@@ -21,6 +21,7 @@ export interface AppConfig {
     [windowName: string]: Window
   }
 
+  settingsWindowID?: keyof this["windows"]
 
   help: {
     rootURL: string
