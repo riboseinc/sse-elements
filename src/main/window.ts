@@ -91,6 +91,14 @@ export function getWindowByTitle(title: string): BrowserWindow | undefined {
 }
 
 
+export function closeWindow(title: string) {
+  const win = getWindowByTitle(title);
+  if (win !== undefined) {
+    win.close();
+  }
+}
+
+
 export function getWindow(func: (win: BrowserWindow) => boolean): BrowserWindow | undefined {
   return windows.find(func);
 }
