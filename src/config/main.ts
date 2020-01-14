@@ -8,8 +8,8 @@ export interface MainConfig<App extends AppConfig> {
   singleInstance: boolean
   disableGPU: boolean
   databases: {
-    default: DatabaseConfig,
-    [dbName: string]: DatabaseConfig,
+    default: DatabaseConfig
+    [dbName: string]: DatabaseConfig
   }
   managers: {
     [DT in keyof App["data"]]: ManagerConfig<this["databases"]>
