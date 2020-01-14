@@ -52,6 +52,9 @@ export interface VersionedManager<M extends Model, IDType extends AnyIDType> {
 
   listUncommitted?(): Promise<IDType[]>
   /* List IDs of objects with uncommitted changes. */
+
+  setUpIPC?(modelName: string): void
+  /* Initializes IPC endpoints to query or update managed data. */
 }
 
 
