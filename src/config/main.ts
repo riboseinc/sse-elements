@@ -7,6 +7,8 @@ export interface MainConfig<App extends AppConfig> {
   app: App
   singleInstance: boolean
   disableGPU: boolean
+  appDataPath: string
+  settingsFileName: string
   databases: {
     default: DatabaseConfig
     [dbName: string]: DatabaseConfig
