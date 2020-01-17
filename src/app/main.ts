@@ -93,7 +93,11 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
   settings.setUpIPC();
 
   // Prepare database backends & request configuration if needed
-  const dbBackendClasses: { dbName: string, backendClass: DatabaseBackendClass<any, any>, backendOptions: any }[] = (await Promise.all(Object.entries(config.databases).
+  const dbBackendClasses: {
+    dbName: string
+    backendClass: DatabaseBackendClass<any, any>
+    backendOptions: any
+  }[] = (await Promise.all(Object.entries(config.databases).
   map(async ([dbName, dbConf]) => {
     const DBBackendClass = (await dbConf.backend()).default;
     if (DBBackendClass.registerSettingsForConfigurableOptions) {
