@@ -128,10 +128,10 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
     if (DBBackendClass.completeOptionsFromSettings) {
       options = await DBBackendClass.completeOptionsFromSettings(
         settings,
-        backendOptions.options,
+        backendOptions,
         dbName);
     } else {
-      options = backendOptions.options;
+      options = backendOptions;
     }
 
     const backend = new DBBackendClass(options);
