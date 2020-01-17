@@ -33,7 +33,7 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
 
   function _openWindow(windowName: keyof typeof config.app.windows) {
     const openerParams = config.app.windows[windowName].openerParams;
-    return openWindow({ ...openerParams, component: 'default' });
+    return openWindow({ ...openerParams, component: windowName });
   }
 
   function _requestSettings(settings: string[]): Promise<void> {
