@@ -1,48 +1,11 @@
-import React, { useState, useContext } from 'react';
+import React, { useContext } from 'react';
 import { Icon } from '@blueprintjs/core';
 
-import { SupportedLanguages, LangConfig, Translatable } from './types';
+import { Translatable } from '../types';
+
+import { LangConfigContext } from './context';
 
 import styles from './styles.scss';
-
-
-type LocalizerOptions<Languages extends SupportedLanguages> = {
-  languageSetup: {
-    available: Languages
-    default: keyof Languages
-    selected: keyof Languages
-  }
-};
-const LocalizerContextProvider: React.FC<LocalizerOptions<any>> = function ({ languageSetup, children }) {
-  const [langConfig, setLangConfig] = useState({
-    available: languageSetup.available,
-    default: languageSetup.default as string,
-    selected: languageSetup.selected as string,
-    select: (langId: keyof typeof languageSetup.available) => {
-      setLangConfig(langConfig => Object.assign({}, langConfig, { selected: langId }));
-    },
-  });
-
-  return (
-    <LangConfigContext.Provider value={langConfig}>
-      {children}
-    </LangConfigContext.Provider>
-  );
-};
-export default LocalizerContextProvider;
-
-
-interface LangConfigContextSpec extends LangConfig {
-  available: SupportedLanguages,
-  select(id: string): void,
-}
-
-export const LangConfigContext = React.createContext<LangConfigContextSpec>({
-  available: { en: 'English', zh: 'Chinese', ru: 'Russian' },
-  default: 'en' as const,
-  selected: 'en',
-  select: (id: string) => {},
-});
 
 
 interface TranslatableComponentProps { what: Translatable<string> }
