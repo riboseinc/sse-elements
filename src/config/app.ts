@@ -22,6 +22,7 @@ export interface AppConfig {
   }
 
   settingsWindowID?: keyof this["windows"]
+  splashWindowID?: keyof this["windows"]
 
   help: {
     rootURL: string

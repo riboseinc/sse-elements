@@ -79,6 +79,13 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
   // Catch unhandled errors in electron-log
   log.catchErrors({ showDialog: true });
 
+  // Show splash window, if configured
+  const splashWindow = config.app.windows[config.app.splashWindowID];
+  if (splashWindow) {
+    // Still need to wait until app is ready
+    app.whenReady().then(() => { _openWindow(config.app.splashWindowID); });
+  }
+
   const isMacOS = process.platform === 'darwin';
   const isDevelopment = process.env.NODE_ENV !== 'production';
 
@@ -154,6 +161,9 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
 
   app.whenReady()
   .then(() => {
+    // Close splash window before opening the default window
+    closeWindow(splashWindow.openerParams.title);
+
     _openWindow('default');
 
     // Initialize window-opening endpoints
