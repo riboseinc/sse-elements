@@ -1,3 +1,7 @@
+// Jury-rig globa.fetch to make Isomorphic Git work under Node
+import fetch from 'node-fetch';
+(global as any).fetch = fetch;
+
 import { app, App, ipcMain } from 'electron';
 import * as log from 'electron-log';
 import { AppConfig, Window } from '../config/app';
