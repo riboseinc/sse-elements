@@ -69,8 +69,8 @@ implements VersionedFilesystemBackend {
       dbID: string) {
 
     const paneLabelPostfix = dbID !== 'default' ? ` for “${dbID}”` : '';
-    const settingIDPrefix = `${dbID}_`;
-    const paneID = `dataSources_${dbID}`;
+    const settingIDPrefix = `db_${dbID}_`;
+    const paneID = `db_${dbID}`;
 
     settings.configurePane({
       id: paneID,
@@ -116,7 +116,7 @@ implements VersionedFilesystemBackend {
       availableOptions: InitialBackendOptions,
       dbID: string) {
 
-    const settingIDPrefix = `${dbID}_`;
+    const settingIDPrefix = `db_${dbID}_`;
 
     async function getSetting<T>(settingID: string): Promise<T> {
       return await settings.getValue(`${settingIDPrefix}${settingID}`) as T;
