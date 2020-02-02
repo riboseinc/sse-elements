@@ -1,3 +1,5 @@
+NOTE: As of the latest commit in `config-refactor` branch, future development has moved to Coulomb repository.
+
 = Static site editor elements
 
 SSE (Static Site Editor) aims to simplify the creation of cross-platform
