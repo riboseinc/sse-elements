@@ -1,13 +1,19 @@
 import * as path from 'path';
 
-import { listen } from '../../../api/main';
+import { listen } from '../../../ipc/main';
 
 import { ModelConfig } from '../../../config/app';
 import { ManagerOptions } from '../../../config/main';
 import { Model, AnyIDType } from '../../models';
 import { Index } from '../../query';
-import { VersionedFilesystemBackend, VersionedManager, VersionedFilesystemManager, CommitError } from '../base';
-import { isGitError } from './base';
+import {
+  VersionedFilesystemBackend,
+  VersionedManager,
+  VersionedFilesystemManager,
+  CommitError,
+} from '../../main/base';
+
+import { isGitError } from './isogit/base';
 
 
 class Manager<M extends Model, IDType extends AnyIDType>
@@ -157,17 +163,17 @@ implements VersionedManager<M, IDType>, VersionedFilesystemManager {
     listen<{}, Index<M>>
     (`${prefix}-read-all`, async () => {
       return await this.readAll();
-    })
+    });
 
     listen<{ objectID: IDType }, M>
     (`${prefix}-read-one`, async ({ objectID }) => {
       return await this.read(objectID);
-    })
+    });
 
     listen<{}, IDType[]>
     (`${prefix}-read-uncommitted-ids`, async () => {
       return await this.listUncommitted();
-    })
+    });
 
     listen<
       { objectIDs: IDType[], commitMessage: string },
@@ -175,13 +181,13 @@ implements VersionedManager<M, IDType>, VersionedFilesystemManager {
     (`${prefix}-commit-objects`, async ({ objectIDs, commitMessage }) => {
       await this.commit(objectIDs, commitMessage);
       return { success: true };
-    })
+    });
 
     listen<{ objectIDs: IDType[] }, { success: true }>
     (`${prefix}-discard-all-uncommitted`, async ({ objectIDs }) => {
       await this.discard(objectIDs);
       return { success: true };
-    })
+    });
   }
 }
 

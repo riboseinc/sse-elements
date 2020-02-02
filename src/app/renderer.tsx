@@ -35,6 +35,8 @@ export const renderApp = async <A extends AppConfig, C extends RendererConfig<A>
   const componentId = searchParams.get('c');
   const componentImporter = componentId ? config.windowComponents[componentId] : null;
 
+  log.debug(`Requested window component ${componentId}`);
+
   // Fetch top-level UI component class and render it.
   if (componentImporter) {
     // Show loading indicator while components are being resolved
@@ -63,13 +65,13 @@ export const renderApp = async <A extends AppConfig, C extends RendererConfig<A>
     var appMarkup = <TopWindowComponent query={searchParams} />;
 
     log.debug(  
-      `Got context provider components`,
+      `C/renderApp: Got context provider components`,
       ctxProviderComponents);
 
     // Wrap the JSX into context provider components
     for (const [idx, ContextProvider] of ctxProviderComponents.entries()) {
-      log.debug(  
-        `Initializing context provider #${idx}`,
+      log.verbose(  
+        `C/renderApp: Initializing context provider #${idx}`,
         ctxProviderComponents[idx],
         ctxProviderOptions[idx]);
 
@@ -79,6 +81,8 @@ export const renderApp = async <A extends AppConfig, C extends RendererConfig<A>
         </ContextProvider>
       );
     }
+
+    log.debug("C/renderApp: Rendering");
 
     // Render the JSX
     ReactDOM.render(appMarkup, appRoot);

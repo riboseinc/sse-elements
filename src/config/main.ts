@@ -26,7 +26,7 @@ export interface MainConfig<App extends AppConfig> {
 // Databases
 
 interface DatabaseConfig {
-  backend: () => Promise<{ default: DatabaseBackendClass<any, any> }>
+  backend: () => Promise<{ default: DatabaseBackendClass<any, any, any> }>
 
   // If not all options are supplied in configuration in code,
   // the missing ones will be required from the user via initial configuration window.

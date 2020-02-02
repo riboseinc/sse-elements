@@ -4,16 +4,18 @@ import fetch from 'node-fetch';
 
 import { app, App, ipcMain } from 'electron';
 import * as log from 'electron-log';
+
 import { AppConfig, Window } from '../config/app';
 import { MainConfig } from '../config/main';
 import { SettingManager } from '../settings/main';
+import { notifyAllWindows } from '../main/window';
 import {
   VersionedFilesystemBackend,
   VersionedManager,
   BackendClass as DatabaseBackendClass,
 } from '../db/main/base';
 
-import { makeWindowEndpoint } from '../api/main';
+import { listen, unlisten, Handler, makeWindowEndpoint } from '../ipc/main';
 import { openWindow, closeWindow } from '../main/window';
 
 
@@ -35,18 +37,35 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
 
   /* Helper functions */
 
-  function _openWindow(windowName: keyof typeof config.app.windows) {
-    const openerParams = config.app.windows[windowName].openerParams;
-    return openWindow({ ...openerParams, component: windowName });
+  function _openWindow(windowName: keyof typeof config.app.windows, extraComponentParams: string = '') {
+    log.verbose(`C/main: Opening window ${String(windowName)}`);
+
+    const defaultParams = config.app.windows[windowName].openerParams;
+
+    const openerParams = {
+      ...defaultParams,
+      componentParams: `${defaultParams.componentParams}&${extraComponentParams}`,
+    };
+
+    return openWindow({
+      ...openerParams,
+      component: windowName,
+    });
   }
 
   function _requestSettings(settings: string[]): Promise<void> {
+    /* Open settings window, prompting the user
+       to fill in parameters required for application
+       to perform a function.
+       The window is expected to use commitSetting IPC calls,
+       which is how default settings widgets work. */
+
     const settingsWindow = config.app.windows[config.app.settingsWindowID];
     if (settingsWindow) {
       return new Promise<void>(async (resolve, reject) => {
         var resolvedSettings: { [key: string]: any } = {};
 
-        async function handleSetting(evt: any, name: string, value: any) {
+        const handleSetting: Handler<{ name: string, value: any }, {}> = async function ({ name, value }) {
           if (settings.indexOf(name) >= 0) {
             // If we got a value for one of our requested settings,
             // check if all requested settings have defined values
@@ -57,14 +76,19 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
               settings.filter(s => resolvedSettings[s] === undefined).length < 1;
 
             if (allSettingsResolved) {
-              ipcMain.removeListener('set-setting', handleSetting);
+              unlisten('commitSetting', handleSetting);
               await closeWindow(settingsWindow.openerParams.title);
               resolve();
+            } else {
+              log.verbose(
+                "C/main: Specified setting value, remaining required settings exist",
+                settings.filter(s => resolvedSettings[s] === undefined))
             }
           }
+          return {};
         }
-        ipcMain.on('set-setting', handleSetting);
-        await _openWindow(config.app.settingsWindowID);
+        listen('commitSetting', handleSetting);
+        await _openWindow(config.app.settingsWindowID, `requiredSettings=${settings.join(',')}`);
       });
     } else {
       throw new Error("Settings were requested, but settings window is not specified");
@@ -82,7 +106,7 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
   // Show splash window, if configured
   const splashWindow = config.app.windows[config.app.splashWindowID];
   if (splashWindow) {
-    // Still need to wait until app is ready
+    // Can’t display splash screen before the app is ready
     app.whenReady().then(() => { _openWindow(config.app.splashWindowID); });
   }
 
@@ -92,75 +116,113 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
   const settings = new SettingManager(config.appDataPath, config.settingsFileName);
   settings.setUpIPC();
 
+
   // Prepare database backends & request configuration if needed
-  const dbBackendClasses: {
+
+  log.debug("C/initMain: DB: Reading backend config", config.databases);
+
+  let dbBackendClasses: {
     dbName: string
-    backendClass: DatabaseBackendClass<any, any>
+    backendClass: DatabaseBackendClass<any, any, any>
     backendOptions: any
-  }[] = (await Promise.all(Object.entries(config.databases).
-  map(async ([dbName, dbConf]) => {
-    const DBBackendClass = (await dbConf.backend()).default;
-    if (DBBackendClass.registerSettingsForConfigurableOptions) {
-      DBBackendClass.registerSettingsForConfigurableOptions(settings, dbConf.options, dbName);
+  }[];
+
+  dbBackendClasses = (await Promise.all(Object.entries(config.databases).map(
+    async ([dbName, dbConf]) => {
+      log.debug("C/initMain: DB: Reading backend config", dbName, dbConf);
+
+      const DBBackendClass = (await dbConf.backend()).default;
+      if (DBBackendClass.registerSettingsForConfigurableOptions) {
+        DBBackendClass.registerSettingsForConfigurableOptions(settings, dbConf.options, dbName);
+      }
+      return {
+        dbName: dbName,
+        backendClass: DBBackendClass,
+        backendOptions: dbConf.options,
+      };
     }
-    return {
-      dbName: dbName,
-      backendClass: DBBackendClass,
-      backendOptions: dbConf.options,
-    };
-  })));
+  )));
 
 
   // Request settings from user via an initial configuration window, if required
+
   const missingSettings = await settings.listMissingRequiredSettings();
+  // List of IDs of settings that need to be filled out.
+
   if (missingSettings.length > 0) {
+    log.verbose("C/initMain: Missing settings present, requesting from the user", missingSettings);
     await _requestSettings(missingSettings);
+  } else {
+    log.debug("C/initMain: No missing settings found");
   }
 
 
-  // Initialize database backends
+  // Construct database backend instances
+
   type DBs = MainApp<any, C>["databases"];
-  const databases: DBs = dbBackendClasses.
-  map(async ({ dbName, backendClass, backendOptions }) => {
-    const DBBackendClass = backendClass;
+  let databases: DBs
 
-    let options: any;
-    if (DBBackendClass.completeOptionsFromSettings) {
-      options = await DBBackendClass.completeOptionsFromSettings(
-        settings,
-        backendOptions,
-        dbName);
-    } else {
-      options = backendOptions;
-    }
+  try {
+    databases = (await Promise.all(dbBackendClasses.map(
+      async ({ dbName, backendClass, backendOptions }) => {
+        const DBBackendClass = backendClass;
 
-    const backend = new DBBackendClass(options);
+        log.verbose("C/initMain: DB: Completing backend options from", backendOptions);
 
-    await backend.init();
+        let options: any;
+        if (DBBackendClass.completeOptionsFromSettings) {
+          options = await DBBackendClass.completeOptionsFromSettings(
+            settings,
+            backendOptions,
+            dbName);
+        } else {
+          options = backendOptions;
+        }
 
-    if (backend.setUpIPC) {
-      backend.setUpIPC(dbName);
-    }
+        log.verbose("C/initMain: DB: Initializing backend with options", backendOptions);
 
-    return { [dbName]: backend };
-  }).reduce((val, acc) => ({ ...acc, ...val }), {} as Partial<DBs>) as DBs;
+        const backend = new DBBackendClass(
+           options,
+           (payload: any) => reportBackendStatusToAllWindows(`db-${dbName}`, payload));
+
+        if (backend.setUpIPC) {
+          backend.setUpIPC(dbName);
+        }
+
+        return { [dbName]: backend };
+      }
+    ))).reduce((val, acc) => ({ ...acc, ...val }), {} as Partial<DBs>) as DBs;
+  } catch (e) {
+    log.error("C/initMain: Failed to initialize database backends");
+    throw e;
+  }
 
 
   // Initialize model managers
+
+  log.debug("C/initMain: Initializing data model managers", config.managers)
+
   type Managers = MainApp<any, C>["managers"];
-  const managers: Managers = (await Promise.all(Object.entries(config.managers).
-  map(async ([modelName, managerConf]) => {
-    const modelConf = config.app.data[modelName];
-    const db = databases[managerConf.dbName];
-    const ManagerClass = (await managerConf.options.cls()).default;
-    const manager = new ManagerClass(db, managerConf.options, modelConf);
+  let managers: Managers;
 
-    if (manager.setUpIPC) {
-      manager.setUpIPC(modelName);
+  managers = (await Promise.all(Object.entries(config.managers).map(
+    async ([modelName, managerConf]) => {
+      const modelConf = config.app.data[modelName];
+
+      log.verbose("C/initMain: Initializing model manager for DB", managerConf.dbName, databases);
+
+      const db = databases[managerConf.dbName];
+      const ManagerClass = (await managerConf.options.cls()).default;
+      const manager = new ManagerClass(db, managerConf.options, modelConf);
+
+      if (manager.setUpIPC) {
+        manager.setUpIPC(modelName);
+      }
+
+      return { [modelName]: manager };
     }
-
-    return { [modelName]: manager };
-  }))).reduce((val, acc) => ({ ...acc, ...val }), {} as Partial<Managers>) as Managers;
+  )))
+  .reduce((val, acc) => ({ ...acc, ...val }), {} as Partial<Managers>) as Managers;
 
 
   app.whenReady()
@@ -169,6 +231,18 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
     closeWindow(splashWindow.openerParams.title);
 
     _openWindow('default');
+
+    // DB backend initialization happens after the app is ready,
+    // since it may require user input (and hence GUI interaction)
+    // of sensitive data not suitable for settings,
+    // namely authentication keys if data source requires auth.
+    // TODO: Teaching the framework to encrypt settings
+    // might let us make authentication data entry
+    // part of required settings entry
+    // and start data source initialization early.
+    for (const backend of Object.values(databases)) {
+      backend.init();
+    }
 
     // Initialize window-opening endpoints
     for (const [windowName, window] of Object.entries(config.app.windows)) {
@@ -190,6 +264,11 @@ export const initMain = async <C extends MainConfig<any>>(config: C): Promise<Ma
 
   return main as MainApp<typeof config.app, typeof config>;
 };
+
+
+async function reportBackendStatusToAllWindows(dbName: string, payload: any) {
+  return await notifyAllWindows(`db-${dbName}-status`, payload);
+}
 
 
 export interface MainApp<A extends AppConfig, M extends MainConfig<A>> {

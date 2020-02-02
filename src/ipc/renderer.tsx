@@ -40,7 +40,7 @@ export function useIPCValue<I extends object, O>
           if (resp.errors.length > 0) {
             updateErrors(resp.errors);
           } else {
-            updateErrors(["Unknown werror"]);
+            updateErrors(["Unknown error"]);
           }
         }
       } else {
@@ -61,7 +61,6 @@ export function useIPCValue<I extends object, O>
 export function useIPCRequest<I extends object, O>
 (endpointName: string, payload?: I): Promise<O> {
   return ipcEndpointRequestLock.acquire(endpointName, async function () {
-    console.debug(payload);
     const rawData = await ipcRenderer.invoke(endpointName, JSON.stringify(payload));
     return new Promise<O>((resolve, reject) => {
       const data = JSON.parse(rawData, reviveJsonValue);
@@ -84,6 +83,16 @@ export function useIPCRequest<I extends object, O>
       }
     });
   });
+}
+
+
+export async function useIPCWindowEventRelayer
+<
+  I extends object = { eventName: string, eventPayload?: any },
+  O = { success: true },
+>
+(payload: I): Promise<O> {
+  return await useIPCRequest<I, O>('relay-event-to-all-windows', payload);
 }
 
 

@@ -3,25 +3,30 @@ import * as fs from 'fs-extra';
 
 import { ipcMain } from 'electron';
 
-import { listen } from '../../../api/main';
+import { listen } from '../../../ipc/main';
+import { Setting, SettingManager } from '../../../settings/main';
 
 import { Index } from '../../query';
+import { UniqueConstraintError } from '../../errors';
 
-import { Setting, SettingManager } from '../../../settings/main';
-import { BackendClass, VersionedFilesystemBackend, VersionedFilesystemManager } from '../base';
+import {
+  BackendClass,
+  BackendStatus as BaseBackendStatus,
+  BackendStatusReporter as BaseBackendStatusReporter,
+  VersionedFilesystemBackend,
+  VersionedFilesystemManager,
+} from '../../main/base';
+
 import { YAMLDirectoryWrapper } from './yaml';
 import { IsoGitWrapper } from './isogit';
-import { UniqueConstraintError } from '../../errors';
 
 
 export interface FixedBackendOptions {
   /* Settings supplied by the developer */
-
   workDir: string
   corsProxyURL: string
   upstreamRepoURL: string
 }
-
 
 export interface ConfigurableBackendOptions {
   /* Settings that user can or must specify */
@@ -31,13 +36,23 @@ export interface ConfigurableBackendOptions {
   authorEmail: string
 }
 
-
 export type BackendOptions = FixedBackendOptions & ConfigurableBackendOptions
 
 export type InitialBackendOptions = FixedBackendOptions & Partial<ConfigurableBackendOptions>
 
 
-export const Backend: BackendClass<InitialBackendOptions, BackendOptions> = class Backend
+export interface BackendStatus extends BaseBackendStatus {
+  isOffline: boolean
+  hasLocalChanges: boolean
+  needsPassword: boolean
+  statusRelativeToLocal: 'ahead' | 'behind' | 'diverged' | 'updated' | undefined
+  isPushing: boolean
+  isPulling: boolean
+}
+export type BackendStatusReporter = BaseBackendStatusReporter<BackendStatus>
+
+
+export const Backend: BackendClass<InitialBackendOptions, BackendOptions, BackendStatus> = class Backend
 implements VersionedFilesystemBackend {
   /* Combines a filesystem storage with Git. */
 
@@ -45,7 +60,7 @@ implements VersionedFilesystemBackend {
   private fs: YAMLDirectoryWrapper;
   private managers: VersionedFilesystemManager[];
 
-  constructor(private opts: BackendOptions) {
+  constructor(private opts: BackendOptions, private reportBackendStatus: BackendStatusReporter) {
     this.fs = new YAMLDirectoryWrapper(this.opts.workDir);
 
     this.git = new IsoGitWrapper(
@@ -57,6 +72,8 @@ implements VersionedFilesystemBackend {
     );
 
     this.managers = [];
+
+    this.synchronize = this.synchronize.bind(this);
 
     // this.collections = Object.entries(this.opts.collections).map(([collectionID, collectionOptions]) => {
     //   return { [collectionID]: { index: {}, opts: collectionOptions } } as Partial<Collections>;
@@ -142,10 +159,6 @@ implements VersionedFilesystemBackend {
     }
   }
 
-  public getWorkDir() {
-    return this.opts.workDir;
-  }
-
   public async registerManager(manager: VersionedFilesystemManager) {
     this.managers.push(manager);
   }
@@ -174,10 +187,6 @@ implements VersionedFilesystemBackend {
     }
 
     await this.git.loadAuth();
-  }
-
-  public async authenticate() {
-    // Authenticates Git
   }
 
   public async read(objID: string, metaFields: string[]) {
@@ -249,7 +258,8 @@ implements VersionedFilesystemBackend {
 
   public async resetOrphanedFileChanges(): Promise<void> {
     /* Remove from filesystem any files under our FS backend path
-       that the backend cannot account for. */
+       that the backend cannot account for,
+       but which may appear as unstaged changes to Git. */
 
     const orphanFilePaths = (await this.readUncommittedFileInfo()).
     map(fileinfo => fileinfo.path).
@@ -277,14 +287,22 @@ implements VersionedFilesystemBackend {
     return `${objID}`;
   }
 
+  private async synchronize() {
+    return await this.git.synchronize(this.reportBackendStatus);
+  }
+
+  private async checkUncommitted() {
+    return await this.git.checkUncommitted(this.reportBackendStatus);
+  }
+
   public setUpIPC(dbID: string) {
     log.verbose("SSE: IsoGitWrapper: Setting up IPC");
 
     const prefix = `db-${dbID}`;
 
-    ipcMain.on(`${prefix}-git-trigger-sync`, this.git.synchronize);
-    ipcMain.on(`${prefix}-git-discard-unstaged`, () => this.git.resetFiles());
-    ipcMain.on(`${prefix}-git-update-status`, this.git.checkUncommitted);
+    ipcMain.on(`${prefix}-git-trigger-sync`, this.synchronize);
+    ipcMain.on(`${prefix}-git-discard-unstaged`, () => this.git.resetFiles() );
+    ipcMain.on(`${prefix}-git-update-status`, this.checkUncommitted);
 
     listen<{ name: string, email: string, username: string }, { success: true }>
     (`${prefix}-git-config-set`, async ({ name, email, username }) => {
@@ -297,7 +315,7 @@ implements VersionedFilesystemBackend {
       await this.git.loadAuth();
       // ^ this.git.auth.username = username
 
-      this.git.synchronize();
+      this.synchronize();
 
       return { success: true };
     });
@@ -308,7 +326,7 @@ implements VersionedFilesystemBackend {
       log.verbose("SSE: IsoGitWrapper: received git-set-password request");
 
       this.git.setPassword(password);
-      this.git.synchronize();
+      this.synchronize();
 
       return { success: true };
     });
@@ -326,91 +344,5 @@ implements VersionedFilesystemBackend {
     });
   }
 }
-
-
-// TODO: Temporary workaround since isomorphic-git doesn’t seem to export its GitError class
-// in any way available to TS, so we can’t use instanceof :(
-
-export function isGitError(e: Error & { code: string }) {
-  if (!e.code) {
-    return false;
-  }
-  return Object.keys(IsomorphicGitErrorCodes).indexOf(e.code) >= 0;
-}
-
-const IsomorphicGitErrorCodes = {
-  FileReadError: `FileReadError`,
-  MissingRequiredParameterError: `MissingRequiredParameterError`,
-  InvalidRefNameError: `InvalidRefNameError`,
-  InvalidParameterCombinationError: `InvalidParameterCombinationError`,
-  RefExistsError: `RefExistsError`,
-  RefNotExistsError: `RefNotExistsError`,
-  BranchDeleteError: `BranchDeleteError`,
-  NoHeadCommitError: `NoHeadCommitError`,
-  CommitNotFetchedError: `CommitNotFetchedError`,
-  ObjectTypeUnknownFail: `ObjectTypeUnknownFail`,
-  ObjectTypeAssertionFail: `ObjectTypeAssertionFail`,
-  ObjectTypeAssertionInTreeFail: `ObjectTypeAssertionInTreeFail`,
-  ObjectTypeAssertionInRefFail: `ObjectTypeAssertionInRefFail`,
-  ObjectTypeAssertionInPathFail: `ObjectTypeAssertionInPathFail`,
-  MissingAuthorError: `MissingAuthorError`,
-  MissingCommitterError: `MissingCommitterError`,
-  MissingTaggerError: `MissingTaggerError`,
-  GitRootNotFoundError: `GitRootNotFoundError`,
-  UnparseableServerResponseFail: `UnparseableServerResponseFail`,
-  InvalidDepthParameterError: `InvalidDepthParameterError`,
-  RemoteDoesNotSupportShallowFail: `RemoteDoesNotSupportShallowFail`,
-  RemoteDoesNotSupportDeepenSinceFail: `RemoteDoesNotSupportDeepenSinceFail`,
-  RemoteDoesNotSupportDeepenNotFail: `RemoteDoesNotSupportDeepenNotFail`,
-  RemoteDoesNotSupportDeepenRelativeFail: `RemoteDoesNotSupportDeepenRelativeFail`,
-  RemoteDoesNotSupportSmartHTTP: `RemoteDoesNotSupportSmartHTTP`,
-  CorruptShallowOidFail: `CorruptShallowOidFail`,
-  FastForwardFail: `FastForwardFail`,
-  MergeNotSupportedFail: `MergeNotSupportedFail`,
-  DirectorySeparatorsError: `DirectorySeparatorsError`,
-  ResolveTreeError: `ResolveTreeError`,
-  ResolveCommitError: `ResolveCommitError`,
-  DirectoryIsAFileError: `DirectoryIsAFileError`,
-  TreeOrBlobNotFoundError: `TreeOrBlobNotFoundError`,
-  NotImplementedFail: `NotImplementedFail`,
-  ReadObjectFail: `ReadObjectFail`,
-  NotAnOidFail: `NotAnOidFail`,
-  NoRefspecConfiguredError: `NoRefspecConfiguredError`,
-  MismatchRefValueError: `MismatchRefValueError`,
-  ResolveRefError: `ResolveRefError`,
-  ExpandRefError: `ExpandRefError`,
-  EmptyServerResponseFail: `EmptyServerResponseFail`,
-  AssertServerResponseFail: `AssertServerResponseFail`,
-  HTTPError: `HTTPError`,
-  RemoteUrlParseError: `RemoteUrlParseError`,
-  UnknownTransportError: `UnknownTransportError`,
-  AcquireLockFileFail: `AcquireLockFileFail`,
-  DoubleReleaseLockFileFail: `DoubleReleaseLockFileFail`,
-  InternalFail: `InternalFail`,
-  UnknownOauth2Format: `UnknownOauth2Format`,
-  MissingPasswordTokenError: `MissingPasswordTokenError`,
-  MissingUsernameError: `MissingUsernameError`,
-  MixPasswordTokenError: `MixPasswordTokenError`,
-  MixUsernamePasswordTokenError: `MixUsernamePasswordTokenError`,
-  MissingTokenError: `MissingTokenError`,
-  MixUsernameOauth2formatMissingTokenError: `MixUsernameOauth2formatMissingTokenError`,
-  MixPasswordOauth2formatMissingTokenError: `MixPasswordOauth2formatMissingTokenError`,
-  MixUsernamePasswordOauth2formatMissingTokenError: `MixUsernamePasswordOauth2formatMissingTokenError`,
-  MixUsernameOauth2formatTokenError: `MixUsernameOauth2formatTokenError`,
-  MixPasswordOauth2formatTokenError: `MixPasswordOauth2formatTokenError`,
-  MixUsernamePasswordOauth2formatTokenError: `MixUsernamePasswordOauth2formatTokenError`,
-  MaxSearchDepthExceeded: `MaxSearchDepthExceeded`,
-  PushRejectedNonFastForward: `PushRejectedNonFastForward`,
-  PushRejectedTagExists: `PushRejectedTagExists`,
-  AddingRemoteWouldOverwrite: `AddingRemoteWouldOverwrite`,
-  PluginUndefined: `PluginUndefined`,
-  CoreNotFound: `CoreNotFound`,
-  PluginSchemaViolation: `PluginSchemaViolation`,
-  PluginUnrecognized: `PluginUnrecognized`,
-  AmbiguousShortOid: `AmbiguousShortOid`,
-  ShortOidNotFound: `ShortOidNotFound`,
-  CheckoutConflictError: `CheckoutConflictError`
-}
-
 
 export default Backend;

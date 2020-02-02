@@ -5,12 +5,14 @@ import * as log from 'electron-log';
 
 import { ipcMain } from 'electron';
 import { notifyAllWindows, openWindow, WindowOpenerParams } from '../main/window';
+import { APIResponse, getEventNamesForWindowEndpoint } from '../api_legacy/utils';
 
-import { APIResponse, reviveJsonValue, getEventNamesForEndpoint, getEventNamesForWindowEndpoint } from './utils';
+import { reviveJsonValue } from './utils';
 
 
-type Handler<I, O> = (params: I) => Promise<O>;
-export function listen<I, O>(name: string, handler: Handler<I, O>) {
+export type Handler<I extends object, O extends object> = (params: I) => Promise<O>;
+export function listen<I extends object, O extends object>(
+    name: string, handler: Handler<I, O>) {
   /* Defines an API endpoint with I input and O output types.
      Takes endpoint name and handler function.
 
@@ -21,12 +23,10 @@ export function listen<I, O>(name: string, handler: Handler<I, O>) {
      wrapping the output in response object { errors: string[], result: O },
      and response serialization. */
 
-  const eventNames = getEventNamesForEndpoint(name);
-
-  ipcMain.on(eventNames.request, async (evt: any, rawInput?: string) => {
+  ipcMain.handle(name, async (evt: any, rawInput?: string) => {
     let response: APIResponse<O>;
 
-    // We may be able to switch to JSON’s own (de)serialization behavior
+    // We may be able to switch to Electron’s own (de)serialization behavior
     // if we find a way to plug our bespoke `reviveJsonValue`.
     const input: I = JSON.parse(rawInput || '{}', reviveJsonValue);
 
@@ -39,18 +39,25 @@ export function listen<I, O>(name: string, handler: Handler<I, O>) {
 
     log.debug(`SSE: API: handled request to ${name}`);
 
-    evt.reply(eventNames.response, JSON.stringify(response));
+    return JSON.stringify(response);
   });
 }
 
 
-ipcMain.on('notify-all-windows', async (evt: any, messageName: string, payload?: any) => {
-  /* Allow any window to notify all open windows. */
-  await notifyAllWindows(messageName, payload);
+export function unlisten(eventName: string, handler: Handler<any, any>) {
+  return ipcMain.removeListener(eventName, handler);
+}
+
+
+listen<{ eventName: string, payload?: any }, { success: true }>
+('relay-event-to-all-windows', async ({ eventName, payload }) => {
+  await notifyAllWindows(eventName, payload);
+  return { success: true };
 });
 
 
 export function makeWindowEndpoint(name: string, getWindowOpts: (params: any) => WindowOpenerParams): void {
+  // TODO: Migrate to listen()?
   const eventNames = getEventNamesForWindowEndpoint(name);
 
   ipcMain.on(eventNames.request, async (evt: any, params?: string) => {

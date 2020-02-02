@@ -3,8 +3,9 @@ import * as fs from 'fs-extra';
 import * as log from 'electron-log';
 
 import { ipcMain } from 'electron';
+import { listen } from '../ipc/main';
 
-import { YAMLWrapper } from '../db/main/isogit-yaml/yaml/index';
+import { YAMLWrapper } from '../db/isogit-yaml/main/yaml/index';
 
 
 export interface Pane {
@@ -17,7 +18,7 @@ export interface Pane {
 export class Setting<T> {
   constructor(
 
-    public paneId: string,
+    public paneID: string,
     /* ID of the pane to show the setting under. */
 
     public id: string,
@@ -53,7 +54,7 @@ export class SettingManager {
 
   constructor(public appDataPath: string, public settingsFileName: string) {
     this.settingsPath = path.join(appDataPath, `${settingsFileName}.yaml`);
-    log.debug(`SSE: Settings: Configuring w/path ${this.settingsPath}`);
+    log.debug(`C/settings: Configuring w/path ${this.settingsPath}`);
 
     this.yaml = new YAMLWrapper(appDataPath);
   }
@@ -88,7 +89,7 @@ export class SettingManager {
       const rawVal = this.data[id];
       return rawVal !== undefined ? setting.toUseable(rawVal) : undefined;
     } else {
-      log.warn(`SSE: Settings: Attempted to get value for non-existent setting ${id}`);
+      log.warn(`C/settings: Attempted to get value for non-existent setting ${id}`);
       throw new Error(`Setting to get value for is not found: ${id}`);
     }
   }
@@ -96,7 +97,7 @@ export class SettingManager {
   public async setValue(id: string, val: unknown) {
     // DANGER: Never log setting’s val in raw form
 
-    log.debug(`SSE: Settings: Set value for setting ${id}`);
+    log.debug(`C/settings: Set value for setting ${id}`);
 
     const setting = this.get(id);
     if (setting) {
@@ -109,16 +110,16 @@ export class SettingManager {
   }
 
   public async deleteValue(id: string) {
-    log.debug(`SSE: Settings: Delete setting: ${id}`);
+    log.debug(`C/settings: Delete setting: ${id}`);
     delete this.data[id];
     await this.commit();
   }
 
   private async commit() {
-    log.info("SSE: Settings: Commit new settings");
-    log.debug("SSE: Settings: Commit: Remove file");
+    log.info("C/settings: Commit new settings");
+    log.debug("C/settings: Commit: Remove file");
     await fs.remove(this.settingsPath);
-    log.debug("SSE: Settings: Commit: Write new file");
+    log.debug("C/settings: Commit: Write new file");
     await this.yaml.write(this.settingsFileName, this.data);
   }
 
@@ -127,8 +128,8 @@ export class SettingManager {
   }
 
   public register(setting: Setting<any>) {
-    log.debug("SSE: Settings: Register setting");
-    if (this.panes.find(p => p.id === setting.paneId)) {
+    log.debug("C/settings: Register setting");
+    if (this.panes.find(p => p.id === setting.paneID)) {
       this.registry.push(setting);
 
     } else {
@@ -141,7 +142,28 @@ export class SettingManager {
   }
 
   public setUpIPC() {
-    log.verbose("SSE: Settings: Configure API endpoints");
+    log.verbose("C/settings: Register API endpoints");
+
+    listen<{}, { panes: Pane[] }>
+    ('settingPaneList', async () => {
+      return { panes: this.panes };
+    });
+
+    listen<{}, { settings: Setting<any>[] }>
+    ('settingList', async () => {
+      return { settings: this.registry };
+    });
+
+    listen<{ name: string }, { value: any }>
+    ('settingValue', async ({ name }) => {
+      return await this.getValue(name) as any;
+    });
+
+    listen<{ name: string, value: any }, { success: true }>
+    ('commitSetting', async({ name, value }) => {
+      await this.setValue(name, value);
+      return { success: true };
+    })
 
     ipcMain.on('set-setting', async (evt: any, name: string, value: any) => {
       return await this.setValue(name, value);
@@ -153,7 +175,7 @@ export class SettingManager {
     });
 
     ipcMain.on('clear-setting', async (evt: any, name: string) => {
-      log.debug(`SSE: Settings: received clear-setting request for ${name}`);
+      log.debug(`C/settings: received clear-setting request for ${name}`);
 
       await this.deleteValue(name);
       evt.reply('clear-setting', 'ok');

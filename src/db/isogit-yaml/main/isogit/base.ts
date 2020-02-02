@@ -4,7 +4,7 @@ import AsyncLock from 'async-lock';
 import * as git from 'isomorphic-git';
 import * as log from 'electron-log';
 
-import { notifyAllWindows } from '../../../../main/window';
+import { BackendStatusReporter } from '../base';
 
 import { GitAuthentication } from './types';
 
@@ -57,7 +57,7 @@ export class IsoGitWrapper {
   }
 
   public async forceInitialize() {
-    /* Initializes from scratch: wipes work directory, clones again, adds remotes. */
+    /* Initializes from scratch: wipes work directory, clones repository, adds remotes. */
 
     log.warn("SSE: IsoGitWrapper: Force initializing");
     log.warn("SSE: IsoGitWrapper: Initialize: Removing data directory");
@@ -284,7 +284,10 @@ export class IsoGitWrapper {
     await git.remove({ dir: this.workDir, filepath: '.' });
   }
 
-  private async _handleGitError(e: Error & { code: string }): Promise<void> {
+  private async _handleGitError(
+    sendRemoteStatus: BackendStatusReporter,
+    e: Error & { code: string },
+  ): Promise<void> {
     if (e.code === 'FastForwardFail' || e.code === 'MergeNotSupportedFail') {
       // NOTE: There’s also PushRejectedNonFastForward, but it seems to be thrown
       // for unrelated cases during push (false positive).
@@ -293,13 +296,15 @@ export class IsoGitWrapper {
       await sendRemoteStatus({ statusRelativeToLocal: 'diverged' });
     } else if (['MissingUsernameError', 'MissingAuthorError', 'MissingCommitterError'].indexOf(e.code) >= 0) {
       await sendRemoteStatus({ isMisconfigured: true });
-    } else if (e.code === 'MissingPasswordTokenError' || (e.code === 'HTTPError' && e.message.indexOf('Unauthorized') >= 0)) {
+    } else if (
+        e.code === 'MissingPasswordTokenError'
+        || (e.code === 'HTTPError' && e.message.indexOf('Unauthorized') >= 0)) {
       this.setPassword(undefined);
       await sendRemoteStatus({ needsPassword: true });
     }
   }
 
-  public async checkUncommitted(): Promise<boolean> {
+  public async checkUncommitted(sendRemoteStatus: BackendStatusReporter): Promise<boolean> {
     /* Checks for any uncommitted changes locally present.
        Notifies all windows about the status. */
 
@@ -309,7 +314,7 @@ export class IsoGitWrapper {
     return hasUncommittedChanges;
   }
 
-  public async synchronize(): Promise<void> {
+  public async synchronize(sendRemoteStatus: BackendStatusReporter): Promise<void> {
     /* Checks for connection, local changes and unpushed commits,
        tries to push and pull when there’s opportunity.
 
@@ -319,7 +324,7 @@ export class IsoGitWrapper {
     return await this.stagingLock.acquire('1', async () => {
       log.verbose("SSE: Git: Starting sync");
 
-      const hasUncommittedChanges = await this.checkUncommitted();
+      const hasUncommittedChanges = await this.checkUncommitted(sendRemoteStatus);
 
       if (!hasUncommittedChanges) {
 
@@ -340,7 +345,7 @@ export class IsoGitWrapper {
           } catch (e) {
             log.error(e);
             await sendRemoteStatus({ isPulling: false });
-            await this._handleGitError(e);
+            await this._handleGitError(sendRemoteStatus, e);
             return;
           }
           await sendRemoteStatus({ isPulling: false });
@@ -351,7 +356,7 @@ export class IsoGitWrapper {
           } catch (e) {
             log.error(e);
             await sendRemoteStatus({ isPushing: false });
-            await this._handleGitError(e);
+            await this._handleGitError(sendRemoteStatus, e);
             return;
           }
           await sendRemoteStatus({ isPushing: false });
@@ -380,18 +385,87 @@ async function checkOnlineStatus(): Promise<boolean> {
 }
 
 
-async function sendRemoteStatus(update: Partial<RemoteStatus>) {
-  await notifyAllWindows('remote-storage-status', update);
+// TODO: Temporary workaround since isomorphic-git doesn’t seem to export its GitError class
+// in any way available to TS, so we can’t use instanceof :(
+
+export function isGitError(e: Error & { code: string }) {
+  if (!e.code) {
+    return false;
+  }
+  return Object.keys(IsomorphicGitErrorCodes).indexOf(e.code) >= 0;
 }
 
-
-
-export interface RemoteStatus {
-  isMisconfigured: boolean,
-  isOffline: boolean,
-  hasLocalChanges: boolean,
-  needsPassword: boolean,
-  statusRelativeToLocal: 'ahead' | 'behind' | 'diverged' | 'updated' | undefined,
-  isPushing: boolean,
-  isPulling: boolean,
+const IsomorphicGitErrorCodes = {
+  FileReadError: `FileReadError`,
+  MissingRequiredParameterError: `MissingRequiredParameterError`,
+  InvalidRefNameError: `InvalidRefNameError`,
+  InvalidParameterCombinationError: `InvalidParameterCombinationError`,
+  RefExistsError: `RefExistsError`,
+  RefNotExistsError: `RefNotExistsError`,
+  BranchDeleteError: `BranchDeleteError`,
+  NoHeadCommitError: `NoHeadCommitError`,
+  CommitNotFetchedError: `CommitNotFetchedError`,
+  ObjectTypeUnknownFail: `ObjectTypeUnknownFail`,
+  ObjectTypeAssertionFail: `ObjectTypeAssertionFail`,
+  ObjectTypeAssertionInTreeFail: `ObjectTypeAssertionInTreeFail`,
+  ObjectTypeAssertionInRefFail: `ObjectTypeAssertionInRefFail`,
+  ObjectTypeAssertionInPathFail: `ObjectTypeAssertionInPathFail`,
+  MissingAuthorError: `MissingAuthorError`,
+  MissingCommitterError: `MissingCommitterError`,
+  MissingTaggerError: `MissingTaggerError`,
+  GitRootNotFoundError: `GitRootNotFoundError`,
+  UnparseableServerResponseFail: `UnparseableServerResponseFail`,
+  InvalidDepthParameterError: `InvalidDepthParameterError`,
+  RemoteDoesNotSupportShallowFail: `RemoteDoesNotSupportShallowFail`,
+  RemoteDoesNotSupportDeepenSinceFail: `RemoteDoesNotSupportDeepenSinceFail`,
+  RemoteDoesNotSupportDeepenNotFail: `RemoteDoesNotSupportDeepenNotFail`,
+  RemoteDoesNotSupportDeepenRelativeFail: `RemoteDoesNotSupportDeepenRelativeFail`,
+  RemoteDoesNotSupportSmartHTTP: `RemoteDoesNotSupportSmartHTTP`,
+  CorruptShallowOidFail: `CorruptShallowOidFail`,
+  FastForwardFail: `FastForwardFail`,
+  MergeNotSupportedFail: `MergeNotSupportedFail`,
+  DirectorySeparatorsError: `DirectorySeparatorsError`,
+  ResolveTreeError: `ResolveTreeError`,
+  ResolveCommitError: `ResolveCommitError`,
+  DirectoryIsAFileError: `DirectoryIsAFileError`,
+  TreeOrBlobNotFoundError: `TreeOrBlobNotFoundError`,
+  NotImplementedFail: `NotImplementedFail`,
+  ReadObjectFail: `ReadObjectFail`,
+  NotAnOidFail: `NotAnOidFail`,
+  NoRefspecConfiguredError: `NoRefspecConfiguredError`,
+  MismatchRefValueError: `MismatchRefValueError`,
+  ResolveRefError: `ResolveRefError`,
+  ExpandRefError: `ExpandRefError`,
+  EmptyServerResponseFail: `EmptyServerResponseFail`,
+  AssertServerResponseFail: `AssertServerResponseFail`,
+  HTTPError: `HTTPError`,
+  RemoteUrlParseError: `RemoteUrlParseError`,
+  UnknownTransportError: `UnknownTransportError`,
+  AcquireLockFileFail: `AcquireLockFileFail`,
+  DoubleReleaseLockFileFail: `DoubleReleaseLockFileFail`,
+  InternalFail: `InternalFail`,
+  UnknownOauth2Format: `UnknownOauth2Format`,
+  MissingPasswordTokenError: `MissingPasswordTokenError`,
+  MissingUsernameError: `MissingUsernameError`,
+  MixPasswordTokenError: `MixPasswordTokenError`,
+  MixUsernamePasswordTokenError: `MixUsernamePasswordTokenError`,
+  MissingTokenError: `MissingTokenError`,
+  MixUsernameOauth2formatMissingTokenError: `MixUsernameOauth2formatMissingTokenError`,
+  MixPasswordOauth2formatMissingTokenError: `MixPasswordOauth2formatMissingTokenError`,
+  MixUsernamePasswordOauth2formatMissingTokenError: `MixUsernamePasswordOauth2formatMissingTokenError`,
+  MixUsernameOauth2formatTokenError: `MixUsernameOauth2formatTokenError`,
+  MixPasswordOauth2formatTokenError: `MixPasswordOauth2formatTokenError`,
+  MixUsernamePasswordOauth2formatTokenError: `MixUsernamePasswordOauth2formatTokenError`,
+  MaxSearchDepthExceeded: `MaxSearchDepthExceeded`,
+  PushRejectedNonFastForward: `PushRejectedNonFastForward`,
+  PushRejectedTagExists: `PushRejectedTagExists`,
+  AddingRemoteWouldOverwrite: `AddingRemoteWouldOverwrite`,
+  PluginUndefined: `PluginUndefined`,
+  CoreNotFound: `CoreNotFound`,
+  PluginSchemaViolation: `PluginSchemaViolation`,
+  PluginUnrecognized: `PluginUnrecognized`,
+  AmbiguousShortOid: `AmbiguousShortOid`,
+  ShortOidNotFound: `ShortOidNotFound`,
+  CheckoutConflictError: `CheckoutConflictError`
 }
+

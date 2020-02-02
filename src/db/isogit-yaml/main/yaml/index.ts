@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs-extra';
 import * as yaml from 'js-yaml';
 
-import { AbstractLockingFilesystemWrapper } from '../../fs-wrapper';
+import { AbstractLockingFilesystemWrapper } from '../../../main/fs-wrapper';
 
 import { Schema } from './schema';
 
