@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "repository": "git@github.com:riboseinc/sse-elements.git",
-  "author": "Anton Strogonoff <anton@strogonoff.name>",
+  "author": "Ribose Inc. <open.source@ribose.com>",
   "license": "MIT",
   "scripts": {
     "prepublish": "rm -rf dist; tsc; cp package-dist.json dist/package.json; rsync -avm --include='*.js' --include='*.scss' --include='*.d.ts' -f 'hide,! */' ./src/ ./dist"
